@@ -177,3 +177,7 @@ class Searcher:
         self._status = Status.READY
         self._prefix_id = "cl_{0}".format(self._prefix_id)
         self._model.prefix_id = self._prefix_id
+
+
+if __name__ == "__main__":
+    print("hello numerical_methods")

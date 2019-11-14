@@ -4,14 +4,9 @@ import nrc_equations as nrc
 import logging
 import optimizer
 
-ds = data_handler.Data()
+ds = None
 
-ingredients = ds.data_feed_scenario
-h_ingredients = ds.headers_data_feed
-available_feed = ds.data_available_feed
-h_available_feed = ds.headers_available_feed
-scenarios = ds.data_cattle
-h_scenarios = ds.headers_data_cattle
+ingredients, h_ingredients, available_feed, h_available_feed, scenarios, h_scenarios = [None for i in range(6)]
 
 cnem_lb, cnem_ub = 0.8, 3
 
@@ -38,8 +33,8 @@ class Model:
     opt_sol = None
     prefix_id = ""
 
-    def __init__(self, parameters):
-        self.__cast_data(parameters)
+    def __init__(self, out_ds, parameters):
+        self.__cast_data(out_ds, parameters)
         pass
 
     # def clear_all(self):
@@ -138,8 +133,25 @@ class Model:
     cost_obj_vector = None
     constraints_names = None
 
-    def __cast_data(self, parameters):
+    def __cast_data(self, out_ds, parameters):
         """Retrieve parameters data from table. See data_handler.py for more"""
+        global ds
+        global ingredients
+        global h_ingredients
+        global available_feed
+        global h_available_feed
+        global scenarios
+        global h_scenarios
+
+        ds = out_ds
+
+        ingredients = ds.data_feed_scenario
+        h_ingredients = ds.headers_data_feed
+        available_feed = ds.data_available_feed
+        h_available_feed = ds.headers_available_feed
+        scenarios = ds.data_scenario
+        h_scenarios = ds.headers_data_scenario
+
         self.n_ingredients = available_feed.last_valid_index()
         self.cost_vector = ds.get_column_data(available_feed, h_available_feed.s_special_cost)
         self.neg_vector = ds.get_column_data(ingredients, h_ingredients.s_NEga)

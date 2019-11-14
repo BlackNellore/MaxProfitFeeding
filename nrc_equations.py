@@ -1,4 +1,3 @@
-""" NRC equations used to determine the model's parameter"""
 import numpy as np
 
 
@@ -70,13 +69,26 @@ def pe_ndf(ph_val):
     return 0.01 * (ph_val - 5.46)/0.038
 
 
+feed_keys = ['f_fat', 'f_CP', 'f_NDF', 'f_starch', 'f_sugars', 'f_oa']
+
+
 # TODO: ch4 emissions
-def ch4_diet():
-    pass
+def ch4_diet(feed_properties):
+    test_percentage = 0
+    for i in feed_keys:
+        test_percentage += feed_properties[i]
+    if test_percentage > 1:
+        test_percentage = 0.01
+    else:
+        test_percentage = 1
 
-
-def quick_check_lambda1(v_cneg, v_dmi, sbw, price, cost, linear_factor):
-    return price * linear_factor * 0.87 * v_dmi * v_cneg / np.power(sbw, 0.6836) - v_dmi * cost
+    feed_ge = 0.2389 * (4.15 * (feed_properties['f_NDF'] +
+                                feed_properties['f_starch'] +
+                                feed_properties['f_sugars'] +
+                                feed_properties['f_oa']) +
+                        9.4 * feed_properties['f_fat'] +
+                        5.7 * feed_properties['f_CP']) * test_percentage
+    return {'GE20': (0.065 * feed_ge), 'LE20': (0.03 * feed_ge)}
 
 
 if __name__ == "__main__":

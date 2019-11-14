@@ -170,15 +170,13 @@ class Data:
         return ds
 
     def __init__(self,
-                 filename="Input.xlsx",
-                 sheet_feed="FeedLibrary",
-                 sheet_scenario="Feeds",
-                 sheet_cattle="Cattle"
-                 ):
+                 filename,
+                 sheet_feed,
+                 sheet_scenario,
+                 sheet_cattle):
         """
         Read excel file
         I know, I know, shouldn't be hardcoded, one day I will fix that
-        TODO: Include multi-scenario sheet
         """
         excel_file = pandas.ExcelFile(filename)
 
@@ -198,8 +196,8 @@ class Data:
                             "One or more ingredients in SCENARIO could not be found on INGREDIENTS.\n"
                             "{0}\n\n{1}".format(unwrap_list(filter_ingredients_ids), self.data_feed_scenario))
 
-        self.data_cattle = pandas.read_excel(excel_file, sheet_cattle)
-        self.headers_data_cattle = self.ScenarioParameters(*(list(self.data_cattle)))
+        self.data_scenario = pandas.read_excel(excel_file, sheet_cattle)
+        self.headers_data_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
 
     @staticmethod
     def store_output(results_dict, filename="output.xlsx"):
@@ -238,4 +236,8 @@ class XMLParser:
 
 if __name__ == "__main__":
     print("hello data_handler")
-    Data()
+    ds = Data(filename="Input.xlsx",
+              sheet_feed="FeedLibrary",
+              sheet_scenario="Feeds",
+              sheet_cattle="Scenario"
+              )

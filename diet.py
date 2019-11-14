@@ -3,14 +3,18 @@ from lp_model import Model
 from numerical_methods import Searcher, Status
 import logging
 
-ds = data_handler.Data()
+ds = data_handler.Data(filename="Input.xlsx",
+                       sheet_feed="FeedLibrary",
+                       sheet_scenario="Feeds",
+                       sheet_cattle="Scenario"
+                       )
 
 ingredients = ds.data_feed_scenario
 h_ingredients = ds.headers_data_feed
 available_feed = ds.data_available_feed
 h_available_feed = ds.headers_available_feed
-scenarios = ds.data_cattle
-h_scenarios = ds.headers_data_cattle
+scenarios = ds.data_scenario
+h_scenarios = ds.headers_data_scenario
 
 output_file = "Output.xlsx"
 
@@ -24,7 +28,7 @@ def run_stuff():
         logging.info("{}".format(parameters))
 
         logging.info("Initializing model")
-        model = Model(parameters)
+        model = Model(ds, parameters)
         logging.info("Initializing numerical methods")
         optimizer = Searcher(model)
 
@@ -64,13 +68,13 @@ def run_stuff():
     logging.info("END")
 
 
-if __name__ == "__main__":
+def initialize(special_msg):
     fmt_str = "%(asctime)s: %(levelname)s: %(funcName)s Line:%(lineno)d %(message)s"
     logging.basicConfig(filename="activity.log",
                         level=logging.DEBUG,
                         filemode="w",
                         format=fmt_str)
-    logging.info("Starting diet.py")
+    logging.info(special_msg)
     logging.info("\n\n{}".format(ingredients))
     logging.info("\n\n")
     logging.info("\n\n{}".format(available_feed))
@@ -79,4 +83,7 @@ if __name__ == "__main__":
 
     ingredients.index = range(available_feed.last_valid_index() + 1)
 
+
+if __name__ == "__main__":
+    initialize("Starting diet.py")
     run_stuff()
