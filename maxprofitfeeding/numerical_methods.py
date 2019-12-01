@@ -1,4 +1,4 @@
-from lp_model import Model
+from maxprofitfeeding.lp_model import Model
 import numpy as np
 from aenum import Enum
 import logging

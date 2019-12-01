@@ -1,6 +1,6 @@
-import data_handler
-from lp_model import Model
-from numerical_methods import Searcher, Status
+from maxprofitfeeding import data_handler
+from maxprofitfeeding.lp_model import Model
+from maxprofitfeeding.numerical_methods import Searcher, Status
 import logging
 
 ds = data_handler.Data(filename="Input.xlsx",

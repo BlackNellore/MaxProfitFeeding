@@ -1,8 +1,6 @@
 """ Mathematical model """
-import data_handler
-import nrc_equations as nrc
+from maxprofitfeeding import nrc_equations as nrc, optimizer, data_handler
 import logging
-import optimizer
 
 ds = None
 
@@ -12,7 +10,7 @@ cnem_lb, cnem_ub = 0.8, 3
 
 bigM = 100000
 
-solver = "CPLEX"
+solver = "HiGHS"
 
 
 class Model:
