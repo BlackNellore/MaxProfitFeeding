@@ -29,6 +29,7 @@ def run_stuff():
 
         logging.info("Initializing model")
         model = Model(ds, parameters)
+        model.set_solver("HiGHS")
         logging.info("Initializing numerical methods")
         optimizer = Searcher(model)
 

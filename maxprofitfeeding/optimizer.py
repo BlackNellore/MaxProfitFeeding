@@ -3,8 +3,9 @@ This is a framework that allows you to call whatever solver you would like.
 Just create the respective functions for your preferred library, since we cannot distribute CPLEX :(
 Good luck!
 """
-#import cplex
+import cplex
 from resources import highs_solver
+import logging
 
 opt = None
 model = None
@@ -24,6 +25,13 @@ class Optimizer:
             model = cplex.Cplex()
         if opt is "HiGHS":
             model = highs_solver.Model()
+
+    def set_solver(self, solver):
+        if not self.optmizers.__contains__(solver):
+            logging.ERROR("The solver {} is not implemented.".format(solver))
+            raise ModuleNotFoundError
+        global opt
+        opt = solver
 
     # MODEL CONSTRUCTION
     @staticmethod
@@ -244,9 +252,9 @@ class Optimizer:
         """
         global model
         if opt is "CPLEX":
-            model.write(kwargs["name"], filetype=kwargs["filetype"])
+            model.write(kwargs["name"])
         elif opt is "HiGHS":
-            model.write(kwargs["name"], filetype=kwargs["filetype"])
+            model.write(kwargs["name"])
 
     @staticmethod
     def write_solution(file_name):

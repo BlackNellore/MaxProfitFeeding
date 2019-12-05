@@ -10,8 +10,7 @@ cnem_lb, cnem_ub = 0.8, 3
 
 bigM = 100000
 
-solver = "HiGHS"
-
+solver = None
 
 class Model:
     p_id, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
@@ -23,6 +22,7 @@ class Model:
     _p_nem = None
     _p_pe_ndf = None
     _p_cnem = None
+    _var_names_x = None
 
     _print_model_lp = False
     _print_model_lp_infeasible = False
@@ -35,15 +35,9 @@ class Model:
         self.__cast_data(out_ds, parameters)
         pass
 
-    # def clear_all(self):
-    #     self._diet = None
-    #     self._p_mpm = None
-    #     self._p_dmi = None
-    #     self._p_nem = None
-    #     self._p_pe_ndf = None
-    #     self._p_cnem = None
-    #     self.opt_sol = None
-    #     self.__init__()
+    def set_solver(self, slv):
+        global solver
+        solver = slv
 
     def run(self, p_id, p_cnem):
         """Either build or update model, solve ir and return solution = {dict xor None}"""
@@ -58,7 +52,7 @@ class Model:
                 self.__update_model()
             return self.__solve(p_id)
         except Exception as e:
-            logging.error("An error occurred:\n{}".format(e))
+            logging.error("An error occurred:\n{}".format(str(e)))
             return None
 
     def __debugging(self, problem_id, p_type):
@@ -75,6 +69,7 @@ class Model:
     def __solve(self, problem_id):
         """Return None if solution is infeasible or Solution dict otherwise"""
         diet = self._diet
+        # diet.write_lp(name="CNEm_{}.lp".format(str(self._p_cnem)))
         diet.solve()
         #diet.feasopt()
         status = diet.get_solution_status()
@@ -173,7 +168,7 @@ class Model:
     def __build_model(self):
         """Build model (initially based on CPLEX 12.8.1)"""
         self._diet = optimizer.Optimizer(solver)
-        var_names_x = ["x" + str(j) for j in range(self.n_ingredients + 1)]
+        self._var_names_x = ["x" + str(j) for j in range(self.n_ingredients + 1)]
 
         diet = self._diet
         diet.set_sense(sense="max")
@@ -181,7 +176,7 @@ class Model:
         x_vars = list(diet.add_variables(obj=self.cost_obj_vector,
                                          lb=[0] * len(self.cost_vector),
                                          ub=[1] * len(self.cost_vector),
-                                         names=var_names_x))
+                                         names=self._var_names_x))
 
         "Constraint: sum(x a) == CNEm"
         diet.add_constraint(names=["CNEm GE"],
@@ -266,4 +261,4 @@ class Model:
 
         seq_of_pairs = tuple(zip(new_rhs.keys(), new_rhs.values()))
         self._diet.set_constraint_rhs(seq_of_pairs)
-        self._diet.set_objective_function(list(zip(list(range(len(self.cost_obj_vector))), self.cost_obj_vector)))
+        self._diet.set_objective_function(list(zip(self._var_names_x, self.cost_obj_vector)))

@@ -1,5 +1,5 @@
 import ctypes
-
+import logging
 import numpy as np
 from scipy.sparse import csc_matrix
 
@@ -24,6 +24,10 @@ highslib.Highs_call.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                 ctypes.POINTER(ctypes.c_int))
 highslib.Highs_call.restype = ctypes.c_int
 
+def_status = {0: "optimal", None: "infeasible"}
+
+epsilon = 0.0000001
+infinite = 10000000
 
 def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, avalue):
     """
@@ -55,7 +59,7 @@ def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, 
      };
     """
 
-    global highslib
+    global highslib, retcode
     n_col = len(colcost)
     n_row = len(rowlower)
     n_nz = len(aindex)
@@ -70,10 +74,10 @@ def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, 
     int_array_type_row = ctypes.c_int * n_row
 
     col_value = [0] * n_col
-    col_dual = [0] * n_row
+    col_dual = [0] * n_col
 
     row_value = [0] * n_row
-    row_dual = [0] * n_col
+    row_dual = [0] * n_row
 
     col_basis = [0] * n_col
     row_basis = [0] * n_row
@@ -81,20 +85,23 @@ def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, 
     return_val = 0
 
     col_value = dbl_array_type_col(*col_value)
-    col_dual = dbl_array_type_row(*col_dual)
+    col_dual = dbl_array_type_col(*col_dual)
     row_value = dbl_array_type_row(*row_value)
-    row_dual = dbl_array_type_col(*row_dual)
+    row_dual = dbl_array_type_row(*row_dual)
     col_basis = int_array_type_col(*col_basis)
     row_basis = int_array_type_row(*row_basis)
-
-    retcode = highslib.Highs_call(
-        ctypes.c_int(n_col), ctypes.c_int(n_row), ctypes.c_int(n_nz),
-        dbl_array_type_col(*colcost), dbl_array_type_col(*collower), dbl_array_type_col(*colupper),
-        dbl_array_type_row(*rowlower), dbl_array_type_row(*rowupper),
-        int_array_type_astart(*astart), int_array_type_aindex(*aindex), dbl_array_type_avalue(*avalue),
-        col_value, col_dual,
-        row_value, row_dual,
-        col_basis, row_basis, ctypes.byref(ctypes.c_int(return_val)))
+    try:
+        retcode = highslib.Highs_call(
+            ctypes.c_int(n_col), ctypes.c_int(n_row), ctypes.c_int(n_nz),
+            dbl_array_type_col(*colcost), dbl_array_type_col(*collower), dbl_array_type_col(*colupper),
+            dbl_array_type_row(*rowlower), dbl_array_type_row(*rowupper),
+            int_array_type_astart(*astart), int_array_type_aindex(*aindex), dbl_array_type_avalue(*avalue),
+            col_value, col_dual,
+            row_value, row_dual,
+            col_basis, row_basis, ctypes.byref(ctypes.c_int(return_val)))
+    except Exception as e:
+        logging.error("An error occurred when executing HiGHS: {}".format(str(e)))
+        return None
     return retcode, list(col_value), list(col_dual), list(row_value), list(row_dual), list(col_basis), list(row_basis)
 
 
@@ -115,27 +122,34 @@ class Model:
                 self.constraints[constraint]["active"] = None
 
         def get_solution(self, *args):
-            [self.status,
-             aux_variables,
-             self.dual_variables,
-             aux_constraints,
-             self.reduced_cost,
-             aux_active_constraints,
-             aux_basic_variables] = args
-            var_names = list(self.variables.keys())
-            for i in range(len(aux_variables)):
-                self.variables[var_names[i]] = aux_variables[i]
-                self.basic_variables[var_names[i]] = aux_basic_variables
+            if args[0] is None:
+                self.status = args[0]
+            else:
+                [self.status,
+                 aux_variables,
+                 self.dual_variables,
+                 aux_constraints,
+                 self.reduced_cost,
+                 aux_active_constraints,
+                 aux_basic_variables] = args[0]
+                var_names = list(self.variables.keys())
+                for i in range(len(aux_variables)):
+                    self.variables[var_names[i]] = aux_variables[i]
+                    self.basic_variables[var_names[i]] = aux_basic_variables
 
-            const_names = list(self.constraints.keys())
-            for i in range(len(aux_constraints)):
-                self.constraints[const_names[i]]["optimal"] = aux_constraints[i]
-                slack = self.constraints[const_names[i]]["slack"]
-                self.constraints[const_names[i]]["slack"] = abs(aux_constraints[i] - slack)
-                self.constraints[const_names[i]]["active"] = aux_active_constraints[i]
+                const_names = list(self.constraints.keys())
+                for i in range(len(aux_constraints)):
+                    self.constraints[const_names[i]]["optimal"] = aux_constraints[i]
+                    slack = self.constraints[const_names[i]]["slack"]
+                    self.constraints[const_names[i]]["slack"] = abs(aux_constraints[i] - slack)
+                    self.constraints[const_names[i]]["active"] = aux_active_constraints[i]
+            # print(self.status)
+            # print(def_status[self.status])
+            self.status = def_status[self.status]
 
         def comp_objective(self, variables_coef):
-            self.opt_objective = float(np.dot(list(variables_coef.values()), list(self.variables.values())))
+            if not self.status.__contains__("infeasible"):
+                self.opt_objective = float(np.dot(list(variables_coef.values()), list(self.variables.values())))
 
     colcost, collower, colupper, rowlower, rowupper, astart, aindex, avalue = [[] for i in range(8)]
     var_map = {}
@@ -144,9 +158,9 @@ class Model:
     rev_cs_map = {}
     solution = None
     sense, variables, constraints, var_lb, var_ub = [None for j in range(5)]
+    #equality_constraints = []
 
     def __init__(self):
-        self.sense = 1
         self.variables = {}
         self.constraints = {}
         self.var_lb = {}
@@ -156,7 +170,7 @@ class Model:
         if self.solution is None:
             self.solution = self._Solution(self.variables.keys(), self.constraints)
 
-        self.solution.get_solution(highs_call(
+        sol_highs = highs_call(
             self.colcost,
             self.collower,
             self.colupper,
@@ -164,13 +178,14 @@ class Model:
             self.rowupper,
             self.astart,
             self.aindex,
-            self.avalue))
+            self.avalue)
+        self.solution.get_solution(sol_highs)
 
         self.solution.comp_objective(self.variables)
 
     def _model_check(self):
-        # TODO
-        pass
+        self.colcost, self.collower, self.colupper, self.rowlower,\
+        self.rowupper, self.astart, self.aindex, self.avalue = [[] for i in range(8)]
 
     def _model_compress(self):
         self.var_map = dict(zip(range(len(self.variables)), self.variables.keys()))
@@ -185,12 +200,16 @@ class Model:
         col = []
         data = []
         for cs in range(len(self.constraints)):
-            self.rowlower.append(self.constraints[self.cs_map[cs]]["rhs"])
-            self.rowupper.append(10000.0)
+            self.rowlower.append(self.constraints[self.cs_map[cs]]["lhs"])
+            self.rowupper.append(self.constraints[self.cs_map[cs]]["rhs"])
+            # print(self.constraints[self.cs_map[cs]]["coefficients"])
             for j in range(len(self.constraints[self.cs_map[cs]]["variables"])):
                 col.append(self.rev_var_map[self.constraints[self.cs_map[cs]]["variables"][j]])
                 row.append(cs)
                 data.append(self.constraints[self.cs_map[cs]]["coefficients"][j])
+
+        # print("Max: {0}\n\nst:\nrhs:{1}\n\nlhs:{2}\n\nx lb: {3}\n\nx ub: {4}\n\n".format(
+        #     self.colcost, self.rowlower, self.rowupper, self.collower, self.colupper))
 
         sparse_matrix = csc_matrix((data, (row, col)), shape=(len(self.constraints), len(self.variables)))
         self.aindex = list(sparse_matrix.indices)
@@ -219,7 +238,7 @@ class Model:
         if len(names) == 0:
             names = list(range(len(obj)))
         for i in range(len(names)):
-            self.variables[names[i]] = obj[i]
+            self.variables[names[i]] = obj[i] * self.sense
             self.var_lb[names[i]] = lb[i]
             self.var_ub[names[i]] = ub[i]
         return self.variables
@@ -238,56 +257,74 @@ class Model:
         """
         for i in range(len(names)):
             if senses[i] is "E":
-                self.constraints["{}_GE".format(names[i])] = {}
-                self.constraints["{}_GE".format(names[i])]["variables"] = lin_expr[i][0]
-                self.constraints["{}_GE".format(names[i])]["coefficients"] = lin_expr[i][1]
-                self.constraints["{}_GE".format(names[i])]["rhs"] = rhs[i]
-                self.constraints["{}_LE".format(names[i])] = {}
-                self.constraints["{}_LE".format(names[i])] = {"variables": lin_expr[i][0]}
-                self.constraints["{}_LE".format(names[i])]["coefficients"] = \
-                    [(-1)*lin_expr[i][1][k] for k in range(len(lin_expr[i][1]))]
-                self.constraints["{}_LE".format(names[i])]["rhs"] = -rhs[i]
+                # self.equality_constraints.append(names[i])
+                self.constraints[names[i]] = {}
+                self.constraints[names[i]]["variables"] = lin_expr[i][0]
+                self.constraints[names[i]]["coefficients"] = lin_expr[i][1]
+                self.constraints[names[i]]["lhs"] = rhs[i] - epsilon
+                self.constraints[names[i]]["rhs"] = rhs[i] + epsilon
+                self.constraints[names[i]]["sense"] = "E"
+                # self.constraints["{}_LE".format(names[i])] = {}
+                # self.constraints["{}_LE".format(names[i])] = {"variables": lin_expr[i][0]}
+                # self.constraints["{}_LE".format(names[i])]["coefficients"] = \
+                #     [(-1)*lin_expr[i][1][k] for k in range(len(lin_expr[i][1]))]
+                # self.constraints["{}_LE".format(names[i])]["rhs"] = -rhs[i]
+                # self.constraints["{}_LE".format(names[i])]["sense"] = "L"
+
             elif senses[i] is "G":
                 self.constraints[names[i]] = {}
                 self.constraints[names[i]]["variables"] = lin_expr[i][0]
                 self.constraints[names[i]]["coefficients"] = lin_expr[i][1]
-                self.constraints[names[i]]["rhs"] = rhs[i]
+                self.constraints[names[i]]["lhs"] = rhs[i]
+                self.constraints[names[i]]["rhs"] = infinite
+                self.constraints[names[i]]["sense"] = "G"
             elif senses[i] is "L":
                 self.constraints[names[i]] = {}
                 self.constraints[names[i]]["variables"] = lin_expr[i][0]
-                self.constraints[names[i]]["coefficients"] = \
-                    [(-1)*lin_expr[i][1][k] for k in range(len(lin_expr[i][1]))]
-                self.constraints[names[i]]["rhs"] = -rhs[i]
+                self.constraints[names[i]]["coefficients"] = lin_expr[i][1]
+                self.constraints[names[i]]["lhs"] = -infinite
+                self.constraints[names[i]]["rhs"] = rhs[i]
+                self.constraints[names[i]]["sense"] = "L"
 
     def set_constraint_rhs(self, seq_of_pairs):
         for cons_tuple in seq_of_pairs:
-            self.constraints[cons_tuple[0]] = self.constraints[cons_tuple[1]]
+            if self.constraints[cons_tuple[0]]["sense"] == "E":
+                self.constraints[cons_tuple[0]]["lhs"] = cons_tuple[1] - epsilon
+                self.constraints[cons_tuple[0]]["rhs"] = cons_tuple[1] + epsilon
+            if self.constraints[cons_tuple[0]]["sense"] == "L":
+                self.constraints[cons_tuple[0]]["rhs"] = cons_tuple[1]
+            if self.constraints[cons_tuple[0]]["sense"] == "G":
+                self.constraints[cons_tuple[0]]["lhs"] = cons_tuple[1]
 
     def set_objective_function(self, obj_vec):
         names = list(self.variables.keys())
         for i in range(len(self.variables)):
-            self.variables[names[i]] = obj_vec[i]
+            if names[i] == obj_vec[i][0]:
+                self.variables[names[i]] = obj_vec[i][1] * self.sense
+            else:
+                logging.ERROR("Variable names don't match:\n{0}\n{1}\n\n".format(names, obj_vec))
+                raise IndexError
 
     def get_constraints_names(self):
         cs_names = self.constraints.keys()
-        names = [n.replace("_GE", "") for n in cs_names]
-        names = [n.replace("_LE", "") for n in names]
-        names = list(dict.fromkeys(names))
-        return names
+        return list(dict.fromkeys(cs_names))
 
     def get_constraints_rhs(self, constraints):
         rhs = []
         for cs_name in constraints:
-            rhs.append(self.constraints[cs_name]["rhs"])
+            rhs.append(self.solution.constraints[cs_name]["active"])
         return rhs
 
     def get_variable_names(self):
         return self.variables.keys()
 
     def solve(self):
-        self._model_check()
-        self._model_compress()
-        self._solve()
+        try:
+            self._model_check()
+            self._model_compress()
+            self._solve()
+        except Exception as e:
+            logging.error("An error occurred:\n{}".format(str(e)))
 
     def get_solution_status(self):
         return self.solution.status
@@ -296,7 +333,7 @@ class Model:
         return list(self.solution.variables.values())
 
     def get_solution_obj(self):
-        return self.solution.opt_objective
+        return self.solution.opt_objective * self.sense
 
     def get_solution_activity_levels(self, constraints):
         activity = []
