@@ -1,35 +1,51 @@
-from maxprofitfeeding import data_handler
-from maxprofitfeeding.lp_model import Model
-from maxprofitfeeding.numerical_methods import Searcher, Status
+# from contextlib import contextmanager
+# import sys, os
+#
+# @contextmanager
+# def suppress_stdout():
+#     with open(os.devnull, "w") as devnull:
+#         old_stdout = sys.stdout
+#         sys.stdout = devnull
+#         try:
+#             yield
+#         finally:
+#             sys.stdout = old_stdout
+#
+# import pip
+# required_pkgs = ['pandas', 'scipy', 'aenum']
+# installed_pkgs = [pkg.key for pkg in pip.get()]
+#
+# for package in required_pkgs:
+#     if package not in installed_pkgs:
+#         with suppress_stdout():
+#             pip(['install', package])
+from model import data_handler
+from model.lp_model import Model
+from optimizer.numerical_methods import Searcher, Status
 import logging
+import time
 
-ds = data_handler.Data(filename="Input.xlsx",
-                       sheet_feed="FeedLibrary",
-                       sheet_scenario="Feeds",
-                       sheet_cattle="Scenario"
-                       )
+INPUT = None
+OUTPUT = None
 
-ingredients = ds.data_feed_scenario
-h_ingredients = ds.headers_data_feed
-available_feed = ds.data_available_feed
-h_available_feed = ds.headers_available_feed
-scenarios = ds.data_scenario
-h_scenarios = ds.headers_data_scenario
+[ds,
+ingredients,
+h_ingredients,
+available_feed,
+h_available_feed,
+scenarios,
+h_scenarios] = [None for i in range(7)]
 
-output_file = "Output.xlsx"
-
-
-def run_stuff():
+def run():
     logging.info("Iterating through scenarios")
     results = {}
-    for scenario in scenarios.get_values():
+    for scenario in scenarios.values:
         parameters = dict(zip(h_scenarios, scenario))
         logging.info("Current Scenario:")
         logging.info("{}".format(parameters))
 
         logging.info("Initializing model")
         model = Model(ds, parameters)
-        model.set_solver("HiGHS")
         logging.info("Initializing numerical methods")
         optimizer = Searcher(model)
 
@@ -63,13 +79,23 @@ def run_stuff():
         else:
             logging.warning("Bad Status: {0}, {1}".format(status, parameters))
 
-    logging.info("Exporting solution to {}".format(output_file))
-    ds.store_output(results, output_file)
+    logging.info("Exporting solution to {}".format(OUTPUT))
+    ds.store_output(results, OUTPUT)
 
     logging.info("END")
 
 
 def initialize(special_msg):
+    global ds, ingredients, h_ingredients, available_feed, h_available_feed, scenarios, h_scenarios
+    ds = data_handler.Data(**INPUT)
+
+    ingredients = ds.data_feed_scenario
+    h_ingredients = ds.headers_data_feed
+    available_feed = ds.data_available_feed
+    h_available_feed = ds.headers_available_feed
+    scenarios = ds.data_scenario
+    h_scenarios = ds.headers_data_scenario
+
     fmt_str = "%(asctime)s: %(levelname)s: %(funcName)s Line:%(lineno)d %(message)s"
     logging.basicConfig(filename="activity.log",
                         level=logging.DEBUG,
@@ -85,6 +111,14 @@ def initialize(special_msg):
     ingredients.index = range(available_feed.last_valid_index() + 1)
 
 
+def config(settings):
+    global INPUT, OUTPUT
+    INPUT = settings['input']
+    OUTPUT = settings['output']
+
 if __name__ == "__main__":
+    start_time = time.time()
     initialize("Starting diet.py")
-    run_stuff()
+    run()
+    elapsed_time = time.time() - start_time
+    print(elapsed_time)

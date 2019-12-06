@@ -4,7 +4,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 
 # highs lib folder must be in "LD_LIBRARY_PATH" environment variable
-highslib = ctypes.cdll.LoadLibrary("resources\highs.dll")
+highslib = ctypes.cdll.LoadLibrary("optimizer/resources/highs.dll")
 
 highslib.Highs_call.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                 ctypes.POINTER(ctypes.c_double),
@@ -143,8 +143,6 @@ class Model:
                     slack = self.constraints[const_names[i]]["slack"]
                     self.constraints[const_names[i]]["slack"] = abs(aux_constraints[i] - slack)
                     self.constraints[const_names[i]]["active"] = aux_active_constraints[i]
-            # print(self.status)
-            # print(def_status[self.status])
             self.status = def_status[self.status]
 
         def comp_objective(self, variables_coef):
@@ -158,7 +156,6 @@ class Model:
     rev_cs_map = {}
     solution = None
     sense, variables, constraints, var_lb, var_ub = [None for j in range(5)]
-    #equality_constraints = []
 
     def __init__(self):
         self.variables = {}
@@ -217,9 +214,9 @@ class Model:
         self.avalue = list(sparse_matrix.data)
 
     def set_sense(self, direction="max"):
-        if direction is "max":
+        if direction == "max":
             self.sense = -1
-        elif direction is "min":
+        elif direction == "min":
             self.sense = 1
 
     def add_variables(self, obj=None, lb=None, ub=None, names=None):
@@ -256,7 +253,7 @@ class Model:
         :type names: list
         """
         for i in range(len(names)):
-            if senses[i] is "E":
+            if senses[i] == "E":
                 # self.equality_constraints.append(names[i])
                 self.constraints[names[i]] = {}
                 self.constraints[names[i]]["variables"] = lin_expr[i][0]
@@ -264,21 +261,15 @@ class Model:
                 self.constraints[names[i]]["lhs"] = rhs[i] - epsilon
                 self.constraints[names[i]]["rhs"] = rhs[i] + epsilon
                 self.constraints[names[i]]["sense"] = "E"
-                # self.constraints["{}_LE".format(names[i])] = {}
-                # self.constraints["{}_LE".format(names[i])] = {"variables": lin_expr[i][0]}
-                # self.constraints["{}_LE".format(names[i])]["coefficients"] = \
-                #     [(-1)*lin_expr[i][1][k] for k in range(len(lin_expr[i][1]))]
-                # self.constraints["{}_LE".format(names[i])]["rhs"] = -rhs[i]
-                # self.constraints["{}_LE".format(names[i])]["sense"] = "L"
 
-            elif senses[i] is "G":
+            elif senses[i] == "G":
                 self.constraints[names[i]] = {}
                 self.constraints[names[i]]["variables"] = lin_expr[i][0]
                 self.constraints[names[i]]["coefficients"] = lin_expr[i][1]
                 self.constraints[names[i]]["lhs"] = rhs[i]
                 self.constraints[names[i]]["rhs"] = infinite
                 self.constraints[names[i]]["sense"] = "G"
-            elif senses[i] is "L":
+            elif senses[i] == "L":
                 self.constraints[names[i]] = {}
                 self.constraints[names[i]]["variables"] = lin_expr[i][0]
                 self.constraints[names[i]]["coefficients"] = lin_expr[i][1]
@@ -302,7 +293,7 @@ class Model:
             if names[i] == obj_vec[i][0]:
                 self.variables[names[i]] = obj_vec[i][1] * self.sense
             else:
-                logging.ERROR("Variable names don't match:\n{0}\n{1}\n\n".format(names, obj_vec))
+                logging.ERROR("Variables' names don't match:\n{0}\n{1}\n\n".format(names, obj_vec))
                 raise IndexError
 
     def get_constraints_names(self):

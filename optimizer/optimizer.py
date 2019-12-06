@@ -3,35 +3,38 @@ This is a framework that allows you to call whatever solver you would like.
 Just create the respective functions for your preferred library, since we cannot distribute CPLEX :(
 Good luck!
 """
-import cplex
-from resources import highs_solver
+# import cplex
+from optimizer import highs_solver
 import logging
 
-opt = None
+optimizers = ["CPLEX", "HiGHS"]
+SOLVER = None
 model = None
 
 
+def config(slv):
+    global SOLVER
+    if slv in optimizers:
+        SOLVER = slv
+    else:
+        raise NotImplementedError("Invalid optimizer chosen.")
+
+
 class Optimizer:
-    optmizers = ["CPLEX", "HiGHS"]
 
     def __init__(self, optimizer=None):
-        global opt
         global model
-        if optimizer in self.optmizers:
-            opt = optimizer
-        else:
-            raise RuntimeError("Invalid optimizer chosen.")
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model = cplex.Cplex()
-        if opt is "HiGHS":
+        if SOLVER == "HiGHS":
             model = highs_solver.Model()
 
     def set_solver(self, solver):
         if not self.optmizers.__contains__(solver):
             logging.ERROR("The solver {} is not implemented.".format(solver))
             raise ModuleNotFoundError
-        global opt
-        opt = solver
+        global SOLVER
+        SOLVER = solver
 
     # MODEL CONSTRUCTION
     @staticmethod
@@ -41,11 +44,11 @@ class Optimizer:
                 Defines objective direction
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             option = {"max": model.objective.sense.maximize,
                       "min": model.objective.sense.minimize}
             model.objective.set_sense(option[kwargs["sense"]])
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             model.set_sense(kwargs["sense"])
 
     @staticmethod
@@ -55,13 +58,13 @@ class Optimizer:
                 Defines variables
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             variables = model.variables.add(obj=kwargs["obj"],
                                             lb=kwargs["lb"],
                                             ub=kwargs["ub"],
                                             names=kwargs["names"])
             return variables
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             variables = model.add_variables(obj=kwargs["obj"],
                                             lb=kwargs["lb"],
                                             ub=kwargs["ub"],
@@ -75,13 +78,13 @@ class Optimizer:
                 Create constraint
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model.linear_constraints.add(names=kwargs["names"],
                                          lin_expr=kwargs["lin_expr"],
                                          rhs=kwargs["rhs"],
                                          senses=kwargs["senses"]
                                          )
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             model.add_constraint(names=kwargs["names"],
                                  lin_expr=kwargs["lin_expr"],
                                  rhs=kwargs["rhs"],
@@ -95,9 +98,9 @@ class Optimizer:
         :param seq_of_pairs: tuple with constraint names and values
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model.linear_constraints.set_rhs(seq_of_pairs)
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             model.set_constraint_rhs(seq_of_pairs)
 
     @staticmethod
@@ -106,9 +109,9 @@ class Optimizer:
         :param objective_vector: list with floats
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model.objective.set_linear(objective_vector)
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             model.set_objective_function(objective_vector)
 
     # AUXILIARY FUNCTIONS
@@ -117,9 +120,9 @@ class Optimizer:
         """
         :return: list with constraint names
         """
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.linear_constraints.get_names()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_constraints_names()
 
     @staticmethod
@@ -128,9 +131,9 @@ class Optimizer:
         :type constraints: list with constraint names
         :return: list with constraint rhs
         """
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.linear_constraints.get_rhs(constraints)
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_constraints_rhs(constraints)
 
     @staticmethod
@@ -138,9 +141,9 @@ class Optimizer:
         """
         :return: list with variable names
         """
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.variables.get_names()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_variable_names()
 
     # SOLVING AND RESULTS
@@ -148,29 +151,29 @@ class Optimizer:
     def solve():
         """Solve model"""
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model.solve()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             model.solve()
 
     @staticmethod
     def feasopt():
         """Relax the constraints"""
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model.feasopt.linear_constraints()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             raise RuntimeError("Chosen solver <{0}> has no method to execute {1}.".format(
-                opt, "feasopt"
+                SOLVER, "feasopt"
             ))
 
     @staticmethod
     def get_solution_status():
         """Status Solution"""
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.solution.get_status_string()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_solution_status()
 
     @staticmethod
@@ -179,9 +182,9 @@ class Optimizer:
         :rtype: list
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.solution.get_values()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_solution_vec()
 
     @staticmethod
@@ -191,9 +194,9 @@ class Optimizer:
         :rtype: float
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.solution.get_objective_value()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_solution_obj()
 
     @staticmethod
@@ -203,9 +206,9 @@ class Optimizer:
         :return: float, objective function value after solve
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.solution.get_activity_levels(constraints)
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_solution_activity_levels(constraints)
 
     # DUAL PROBLEM
@@ -215,9 +218,9 @@ class Optimizer:
         :return: list, reduced costs
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.solution.get_reduced_costs()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_dual_reduced_costs()
 
     @staticmethod
@@ -226,9 +229,9 @@ class Optimizer:
         :return: list, dual variables values
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.solution.get_dual_values()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_dual_values()
 
     @staticmethod
@@ -237,9 +240,9 @@ class Optimizer:
         :return: list, linear slacks of constraints
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             return model.solution.get_linear_slacks()
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             return model.get_dual_linear_slacks()
 
     # DEBUGGING PURPOSES
@@ -251,9 +254,9 @@ class Optimizer:
         :return: void, write lp model in txt file
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model.write(kwargs["name"])
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             model.write(kwargs["name"])
 
     @staticmethod
@@ -263,7 +266,7 @@ class Optimizer:
         :return: void, write solution in xml file
         """
         global model
-        if opt is "CPLEX":
+        if SOLVER == "CPLEX":
             model.solution.write(file_name)
-        elif opt is "HiGHS":
+        elif SOLVER == "HiGHS":
             model.write_solution(file_name)

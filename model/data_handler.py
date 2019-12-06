@@ -1,11 +1,6 @@
 from typing import NamedTuple
 import pandas
-import lxml.etree as et
 import logging
-
-path_output = "outputs/"
-path_rsc = "resources/"
-
 
 def is_number(s):
     try:
@@ -142,7 +137,7 @@ class Data:
     def get_column_data(data_frame, col_name, func=None):
         """ Get all elements of a certain column"""
         if not isinstance(col_name, list):
-            ds = data_frame.filter(items=[col_name]).get_values()
+            ds = data_frame.filter(items=[col_name]).values
             if func is None:
                 resulting_list = [i for i in unwrap_list(ds)]
             else:
@@ -187,7 +182,7 @@ class Data:
         self.headers_available_feed = self.ScenarioFeedProperties(*(list(self.data_available_feed)))
 
         filter_ingredients_ids = \
-            self.data_available_feed.filter(items=[self.headers_available_feed.s_ID]).get_values()
+            self.data_available_feed.filter(items=[self.headers_available_feed.s_ID]).values
         self.data_feed_scenario = self.filter_column(data_feed,
                                                      self.headers_data_feed.s_ID,
                                                      unwrap_list(filter_ingredients_ids))
@@ -212,26 +207,6 @@ class Data:
             df = pandas.DataFrame(results)
             df.to_excel(writer, sheet_name=sheet_name, columns=[*results[0].keys()])
         writer.save()
-
-
-class XMLParser:
-    """
-    DEBUG PURPOSES:
-    Used to transform CPLEX default .sol file in HTML
-    """
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def xml_to_html(xml_file, rsc_xsl_file):
-        dom = et.parse(xml_file)
-        xslt = et.parse(path_rsc + rsc_xsl_file)
-        transform = et.XSLT(xslt)
-        new_dom = transform(dom)
-        file = open("{}_web.html".format(xml_file), "w")
-
-        file.write(str(et.tostring(new_dom, pretty_print=False)))
-        file.close()
 
 
 if __name__ == "__main__":

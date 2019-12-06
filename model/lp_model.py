@@ -1,5 +1,6 @@
 """ Mathematical model """
-from maxprofitfeeding import nrc_equations as nrc, optimizer, data_handler
+from optimizer import optimizer
+from model import nrc_equations as nrc
 import logging
 
 ds = None
@@ -10,7 +11,6 @@ cnem_lb, cnem_ub = 0.8, 3
 
 bigM = 100000
 
-solver = None
 
 class Model:
     p_id, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
@@ -35,10 +35,6 @@ class Model:
         self.__cast_data(out_ds, parameters)
         pass
 
-    def set_solver(self, slv):
-        global solver
-        solver = slv
-
     def run(self, p_id, p_cnem):
         """Either build or update model, solve ir and return solution = {dict xor None}"""
         logging.info("Populating and running model")
@@ -55,17 +51,6 @@ class Model:
             logging.error("An error occurred:\n{}".format(str(e)))
             return None
 
-    def __debugging(self, problem_id, p_type):
-        """For debugging purposes, print stuff"""
-        if self._print_model_lp_infeasible and p_type is "INF":
-            self._diet.write_lp(name="{0}model_{1}".format(data_handler.path_output, problem_id), filetype="lp")
-
-        if self._print_solution_xml and p_type is "XML":
-            solution_file_name = "{0}solution_{1}.xml".format(data_handler.path_output, problem_id)
-            self._diet.write_solution(solution_file_name)
-            xml_parser = data_handler.XMLParser()
-            xml_parser.xml_to_html(solution_file_name, "solution.xsl")
-
     def __solve(self, problem_id):
         """Return None if solution is infeasible or Solution dict otherwise"""
         diet = self._diet
@@ -80,12 +65,8 @@ class Model:
                               [self._p_cnem, self._p_mpm * 0.001, self._p_dmi, self._p_nem, self._p_pe_ndf]))
             sol = {**sol_id, **params}
             self.opt_sol = None
-
             logging.warning("Infeasible parameters:{}".format(sol))
-            self.__debugging(problem_id, "INF")
             return None
-
-        self.__debugging(problem_id, "XML")
 
         sol_id = {"Problem_ID": problem_id}
         sol = dict(zip(diet.get_variable_names(), diet.get_solution_vec()))
@@ -167,7 +148,7 @@ class Model:
 
     def __build_model(self):
         """Build model (initially based on CPLEX 12.8.1)"""
-        self._diet = optimizer.Optimizer(solver)
+        self._diet = optimizer.Optimizer()
         self._var_names_x = ["x" + str(j) for j in range(self.n_ingredients + 1)]
 
         diet = self._diet

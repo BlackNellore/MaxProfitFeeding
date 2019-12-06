@@ -1,4 +1,3 @@
-from maxprofitfeeding.lp_model import Model
 import numpy as np
 from aenum import Enum
 import logging
@@ -15,10 +14,10 @@ class Searcher:
     _solutions = None
 
     def __init__(self, model, obj_func_key="obj_profit", pre_id=""):
-        if isinstance(model, type(Model)):
-            error_message = "The parsed model is not acceptable." \
-                            " Item must be a lpmodel.Model() instance, type found: {0}".format(type(model))
-            raise IOError(error_message)
+        # if isinstance(model, type(Model)):
+        #     error_message = "The parsed model is not acceptable." \
+        #                     " Item must be a lpmodel.Model() instance, type found: {0}".format(type(model))
+        #     raise IOError(error_message)
 
         self._model = model
         self._obj_func_key = obj_func_key
@@ -47,7 +46,7 @@ class Searcher:
         """Executes brute force search algorithm"""
         if self._status != Status.READY:
             self.__clear_searcher()
-        cnem_space = np.linspace(lb, ub, (ub - lb) / p_tol)
+        cnem_space = np.linspace(lb, ub, int(np.ceil((ub - lb) / p_tol)))
         bf_results = self.__brute_force(self._model.run, cnem_space)
         if bf_results is None:
             self._status = Status.ERROR
