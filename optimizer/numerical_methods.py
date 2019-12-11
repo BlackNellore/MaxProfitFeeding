@@ -135,7 +135,7 @@ class Searcher:
                 return self.__golden_section_search_recursive(
                     f, c, b, results, p_id+1, tol, h * inv_phi, c=d, fc=fd)
         except TypeError as e:
-            logging.ERROR("An error occurred in GSS method:\n{}".format(e))
+            logging.error("An error occurred in GSS method:\n{}".format(e))
             return None, None
 
     def get_results(self, best=False):

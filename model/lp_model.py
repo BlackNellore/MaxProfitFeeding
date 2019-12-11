@@ -56,7 +56,6 @@ class Model:
         diet = self._diet
         # diet.write_lp(name="CNEm_{}.lp".format(str(self._p_cnem)))
         diet.solve()
-        #diet.feasopt()
         status = diet.get_solution_status()
         logging.info("Solution status: {}".format(status))
         if status.__contains__("infeasible"):

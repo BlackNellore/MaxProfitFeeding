@@ -1,40 +1,20 @@
-# from contextlib import contextmanager
-# import sys, os
-#
-# @contextmanager
-# def suppress_stdout():
-#     with open(os.devnull, "w") as devnull:
-#         old_stdout = sys.stdout
-#         sys.stdout = devnull
-#         try:
-#             yield
-#         finally:
-#             sys.stdout = old_stdout
-#
-# import pip
-# required_pkgs = ['pandas', 'scipy', 'aenum']
-# installed_pkgs = [pkg.key for pkg in pip.get()]
-#
-# for package in required_pkgs:
-#     if package not in installed_pkgs:
-#         with suppress_stdout():
-#             pip(['install', package])
 from model import data_handler
 from model.lp_model import Model
 from optimizer.numerical_methods import Searcher, Status
 import logging
 import time
 
-INPUT = None
+INPUT = {}
 OUTPUT = None
 
 [ds,
-ingredients,
-h_ingredients,
-available_feed,
-h_available_feed,
-scenarios,
-h_scenarios] = [None for i in range(7)]
+ ingredients,
+ h_ingredients,
+ available_feed,
+ h_available_feed,
+ scenarios,
+ h_scenarios] = [None for i in range(7)]
+
 
 def run():
     logging.info("Iterating through scenarios")
@@ -85,6 +65,12 @@ def run():
     logging.info("END")
 
 
+def config(input_info, output_info):
+    global INPUT, OUTPUT
+    INPUT = input_info
+    OUTPUT = output_info
+
+
 def initialize(special_msg):
     global ds, ingredients, h_ingredients, available_feed, h_available_feed, scenarios, h_scenarios
     ds = data_handler.Data(**INPUT)
@@ -110,11 +96,6 @@ def initialize(special_msg):
 
     ingredients.index = range(available_feed.last_valid_index() + 1)
 
-
-def config(settings):
-    global INPUT, OUTPUT
-    INPUT = settings['input']
-    OUTPUT = settings['output']
 
 if __name__ == "__main__":
     start_time = time.time()

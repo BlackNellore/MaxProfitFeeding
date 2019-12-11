@@ -2,32 +2,42 @@ import ctypes
 import logging
 import numpy as np
 from scipy.sparse import csc_matrix
+import platform
 
 # highs lib folder must be in "LD_LIBRARY_PATH" environment variable
-highslib = ctypes.cdll.LoadLibrary("optimizer/resources/highs.dll")
-
-highslib.Highs_call.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int,
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_int),
-                                ctypes.POINTER(ctypes.c_int),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_double),
-                                ctypes.POINTER(ctypes.c_int),
-                                ctypes.POINTER(ctypes.c_int),
-                                ctypes.POINTER(ctypes.c_int))
-highslib.Highs_call.restype = ctypes.c_int
+highslib = None
 
 def_status = {0: "optimal", None: "infeasible"}
-
 epsilon = 0.0000001
 infinite = 10000000
+
+
+def config():
+    global highslib
+    if platform.system() in ('Windows', 'Microsoft'):
+        highslib = ctypes.cdll.LoadLibrary("./optimizer/resources/highs.dll")
+    else:
+        # TODO: Implement call to LINUS .so solver
+        raise SystemError("Only windows dll available")
+
+    highslib.Highs_call.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_int),
+                                    ctypes.POINTER(ctypes.c_int),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_double),
+                                    ctypes.POINTER(ctypes.c_int),
+                                    ctypes.POINTER(ctypes.c_int),
+                                    ctypes.POINTER(ctypes.c_int))
+    highslib.Highs_call.restype = ctypes.c_int
+
 
 def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, avalue):
     """
@@ -59,7 +69,7 @@ def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, 
      };
     """
 
-    global highslib, retcode
+    global highslib
     n_col = len(colcost)
     n_row = len(rowlower)
     n_nz = len(aindex)
@@ -293,7 +303,7 @@ class Model:
             if names[i] == obj_vec[i][0]:
                 self.variables[names[i]] = obj_vec[i][1] * self.sense
             else:
-                logging.ERROR("Variables' names don't match:\n{0}\n{1}\n\n".format(names, obj_vec))
+                logging.error("Variables' names don't match:\n{0}\n{1}\n\n".format(names, obj_vec))
                 raise IndexError
 
     def get_constraints_names(self):

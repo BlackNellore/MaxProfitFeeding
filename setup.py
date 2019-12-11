@@ -36,7 +36,8 @@ setup(
         "numpy",
         "pandas",
         "scipy",
-        "cython"
+        "cython",
+        "docplex"
     ],
 
 )

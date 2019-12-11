@@ -2,6 +2,7 @@ from typing import NamedTuple
 import pandas
 import logging
 
+
 def is_number(s):
     try:
         float(s)
@@ -130,8 +131,7 @@ class Data:
     @staticmethod
     def filter_column(data_frame, col_name, val):
         """ Filter elements in data_frame where col_name == val or in [val]"""
-        ds = data_frame.mask(col_name, val)
-        return ds
+        return data_frame.mask(col_name, val)
 
     @staticmethod
     def get_column_data(data_frame, col_name, func=None):
@@ -211,8 +211,8 @@ class Data:
 
 if __name__ == "__main__":
     print("hello data_handler")
-    ds = Data(filename="Input.xlsx",
-              sheet_feed="FeedLibrary",
-              sheet_scenario="Feeds",
-              sheet_cattle="Scenario"
-              )
+    test_ds = Data(filename="Input.xlsx",
+                   sheet_feed="FeedLibrary",
+                   sheet_scenario="Feeds",
+                   sheet_cattle="Scenario"
+                   )
