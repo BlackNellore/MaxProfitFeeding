@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
 
     # Version number (initial):
-    version="0.1.0",
+    version="1.0.0",
 
     # Application author details:
     author="BlackNellore",
@@ -35,9 +35,7 @@ setup(
         "aenum",
         "numpy",
         "pandas",
-        "scipy",
-        "cython",
-        "docplex"
+        "scipy"
     ],
 
 )

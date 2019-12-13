@@ -5,21 +5,33 @@ NASEM - National Academies of Sciences, Engineering, and Medicine 2016. Nutrient
 
 
 ## Getting Started
-The software is configured to run using HiGHS solver by default. However, you also have the opion to run it with CPLEX (not distributed).
-
+TLDR:
+```
+>python setup.py intstall
+>input.xlsx
+>python run.py
+>activity.log
+>output.xlsx
+```
 ### Prerequisites
 This python project uses the following lybraries:
-* scipy
+* xlrd
+* openpyxl
 * aenum
-* typing
-* pandas
-* lxml
-* logging
-* ctypes
 * numpy
+* pandas
+* scipy
+
+NOTE: Linear programming solver [HiGHS](https://highs.dev) distributed along.
+
+### Setup
+Execute with administrative rights:
+```
+>python setup.py install
+```
 
 ### Running
-Adjust your input in the file ".\input.xlsx": 
+Adjust your input in the file **"./input.xlsx"**: 
 1. Sheet "Feeds": Choose the available feeds setting the ID, it will automatically retrieve the name from sheet "FeedLibrary" (NASEM, 2016). Set minimum and maximum concentration allowed (between 0 and 1), and feed cost \[US$/kg\].
 2. Sheet "Scenario":
     * ID: Scenario ID \[int\]
@@ -39,26 +51,32 @@ Adjust your input in the file ".\input.xlsx":
     * UB: Concentration of Net Energy for Maintenance (CNEm) \[Mcal/kg\] upper bound (suggestion: 3.0)
     * Tol: Result tolerance (suggested: 0.01)
 3. Run:
-```
->diet.py
-```
-4. Results: if everything is alright, you can check your solution on ".\output.xlsx". Otherwise, you can check the ".\activity.log" to see if any errors happened.
+    ```
+    >python run.py
+    ```
+4. Results: if everything is alright, you can check your solution on **"./output.xlsx"**. Otherwise, you can check the **"./activity.log"** to see if any errors happened.
 
 ## Bonus
+### Settings
+You can change the file names and other settings in ```config.py```:
+```
+INPUT_FILE = {'filename': 'input.xlsx',
+              'sheet_feed': "FeedLibrary",
+               'sheet_scenario': "Feeds",
+               'sheet_cattle': "Scenario"}
+OUTPUT_FILE = 'output.xlsx'
+SOLVER = 'HiGHS'
+```
 ### Solver
-We use the open-source solver [HiGHS](https://highs.dev) to optimize the LP models. Alternatively, you can use CPLEX (based on 12.8.1) by simply changing the header of diet.py:
+We use the open-source solver [HiGHS](https://highs.dev) to optimize the LP models. Alternatively, you can use CPLEX (based on 12.8.1) by simply changing the header of ```config.py``` to:
 ```
-solver = "HiGHS"
-```
-To:
-```
-solver = "CPLEX"
+SOLVER = "CPLEX"
 ```
 Be sure to setup CPLEX properly.
 Moreover, you can use any alternative solver by implementing the appropriate methods on the file ".\maxprofitfeeding\optimizer.py"
 
-### W64 - LINUX
-This project distributes HiGHS' DLL for W64. To run in Linux based systems, add the HiGHS ".so" file in the folder ".\resources" and adjust the reference on ".\resources\highs_solver.py" in line 7:
+#### W64 vs LINUX
+This project distributes HiGHS' DLL for W64. To run in Linux based systems, add the HiGHS ".so" file in the folder **"./optimizer/resources/"** and adjust the reference on **"./optimizer/resources/highs_solver.py"** in line 7:
 ```
 highslib = ctypes.cdll.LoadLibrary("resources\highs.dll")
 ```
