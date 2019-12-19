@@ -16,6 +16,8 @@ NASEM - National Academies of Sciences, Engineering, and Medicine 2016. Nutrient
 * Settings in **"./config.py"**
 
 ### Prerequisites and Setup
+**If you are trying to run on Linux or MacOS scroll down to last item: it won't run.**
+
 This python project requires some libraries. They should be automatically installed if you execute with administrative rights:
 ```
 >python setup.py install
