@@ -5,16 +5,22 @@ NASEM - National Academies of Sciences, Engineering, and Medicine 2016. Nutrient
 
 
 ## Getting Started
-TLDR:
+**TLDR:**
 ```
 >python setup.py intstall
->input.xlsx
 >python run.py
->activity.log
->output.xlsx
 ```
-### Prerequisites
-This python project uses the following lybraries:
+* Input in **"./input.xlsx"**
+* Ouput in **"./output.xlsx"**
+* Log in **"./activity.log"**
+* Settings in **"./config.py"**
+
+### Prerequisites and Setup
+This python project requires some libraries. They should be automatically installed if you execute with administrative rights:
+```
+>python setup.py install
+```
+List of libraries installed:
 * xlrd
 * openpyxl
 * aenum
@@ -24,37 +30,32 @@ This python project uses the following lybraries:
 
 NOTE: Linear programming solver [HiGHS](https://highs.dev) distributed along.
 
-### Setup
-Execute with administrative rights:
-```
->python setup.py install
-```
 
 ### Running
-Adjust your input in the file **"./input.xlsx"**: 
-1. Sheet "Feeds": Choose the available feeds setting the ID, it will automatically retrieve the name from sheet "FeedLibrary" (NASEM, 2016). Set minimum and maximum concentration allowed (between 0 and 1), and feed cost \[US$/kg\].
-2. Sheet "Scenario":
-    * ID: Scenario ID \[int\]
-    * Breed: Breed Name (does not affect result)
-    * SBW: Shrunk Bodyweight \[100; 800\]
-    * BCS: Body Condition Score \[0; 9\]
-    * BE: Breed Factor (check NASEM 2016, pg355 Table 19-1)
-    * L: Lactation Factor {1, 1.2}
-    * SEX: {1, 1.15}
-    * a2: 0 if not considering acclimatization factor, check NASEM (2016) otherwise
-    * PH: Rumen desired pH
-    * Selling Price: Cattle Selling Price per \[U$/kg\]
-    * Linearization factor: 
-    * Algorithm: BF - Brute Force; GSS - Golden Section Search
-    * Identifier: String to name sheets when writing results
-    * LB: Concentration of Net Energy for Maintenance (CNEm) \[Mcal/kg\] lower bound (suggestion: 0.8)
-    * UB: Concentration of Net Energy for Maintenance (CNEm) \[Mcal/kg\] upper bound (suggestion: 3.0)
-    * Tol: Result tolerance (suggested: 0.01)
-3. Run:
+1. Adjust your input in the file **"./input.xlsx"**: 
+    1. Sheet "Feeds": Choose the available feeds setting the ID, it will automatically retrieve the name from sheet "FeedLibrary" (NASEM, 2016). Set minimum and maximum concentration allowed (between 0 and 1), and feed cost \[US$/kg\].
+    2. Sheet "Scenario":
+        * ID: Scenario ID \[int\]
+        * Breed: Breed Name (does not affect result)
+        * SBW: Shrunk Bodyweight \[100; 800\]
+        * BCS: Body Condition Score \[0; 9\]
+        * BE: Breed Factor (check NASEM 2016, pg355 Table 19-1)
+        * L: Lactation Factor {1, 1.2}
+        * SEX: {1, 1.15}
+        * a2: 0 if not considering acclimatization factor, check NASEM (2016) otherwise
+        * PH: Rumen desired pH
+        * Selling Price: Cattle Selling Price per \[U$/kg\]
+        * Linearization factor: 
+        * Algorithm: BF - Brute Force; GSS - Golden Section Search
+        * Identifier: String to name sheets when writing results
+        * LB: Concentration of Net Energy for Maintenance (CNEm) \[Mcal/kg\] lower bound (suggestion: 0.8)
+        * UB: Concentration of Net Energy for Maintenance (CNEm) \[Mcal/kg\] upper bound (suggestion: 3.0)
+        * Tol: Result tolerance (suggested: 0.01)
+2. Run:
     ```
     >python run.py
     ```
-4. Results: if everything is alright, you can check your solution on **"./output.xlsx"**. Otherwise, you can check the **"./activity.log"** to see if any errors happened.
+3. Results: if everything is alright, you can check your solution on **"./output.xlsx"**. Otherwise, you can check the **"./activity.log"** to see if any errors happened.
 
 ## Bonus
 ### Settings
