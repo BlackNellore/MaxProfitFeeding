@@ -126,7 +126,7 @@ class Model:
         h_scenarios = ds.headers_data_scenario
 
         self.n_ingredients = available_feed.last_valid_index()
-        self.cost_vector = ds.get_column_data(available_feed, h_available_feed.s_special_cost)
+        self.cost_vector = ds.get_column_data(available_feed, h_available_feed.s_feed_cost)
         self.neg_vector = ds.get_column_data(ingredients, h_ingredients.s_NEga)
         [self.p_id, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph,
          self.p_selling_price, self.p_linearization_factor,
