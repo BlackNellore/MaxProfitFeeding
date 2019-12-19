@@ -73,10 +73,10 @@ We use the open-source solver [HiGHS](https://highs.dev) to optimize the LP mode
 SOLVER = "CPLEX"
 ```
 Be sure to setup CPLEX properly.
-Moreover, you can use any alternative solver by implementing the appropriate methods on the file ".\maxprofitfeeding\optimizer.py"
+Moreover, you can use any alternative solver by implementing the appropriate methods on the file "./maxprofitfeeding/optimizer.py"
 
 #### W64 vs LINUX
 This project distributes HiGHS' DLL for W64. To run in Linux based systems, add the HiGHS ".so" file in the folder **"./optimizer/resources/"** and adjust the reference on **"./optimizer/resources/highs_solver.py"** in line 7:
 ```
-highslib = ctypes.cdll.LoadLibrary("resources\highs.dll")
+highslib = ctypes.cdll.LoadLibrary("resources/highs.dll")
 ```

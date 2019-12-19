@@ -64,7 +64,7 @@ class Data:
         s_ID: str
         s_min: str
         s_max: str
-        s_special_cost: str
+        s_feed_cost: str
         s_name: str
 
     # Sheet FeedLibrary
