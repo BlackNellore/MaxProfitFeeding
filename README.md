@@ -7,7 +7,7 @@ NASEM - National Academies of Sciences, Engineering, and Medicine 2016. Nutrient
 ## Getting Started
 **TLDR:**
 ```
->python setup.py intstall
+>python setup.py develop
 >python run.py
 ```
 * Input in **"./input.xlsx"**
@@ -20,7 +20,7 @@ NASEM - National Academies of Sciences, Engineering, and Medicine 2016. Nutrient
 
 This python project requires some libraries. They should be automatically installed if you execute with administrative rights:
 ```
->python setup.py install
+>python setup.py develop
 ```
 List of libraries installed:
 * xlrd
