@@ -128,6 +128,36 @@ class Data:
         s_Vit_D: str
         s_Vit_E: str
 
+    def __init__(self,
+                 filename,
+                 sheet_feed,
+                 sheet_scenario,
+                 sheet_cattle):
+        """
+        Read excel file
+        I know, I know, shouldn't be hardcoded, one day I will fix that
+        """
+        excel_file = pandas.ExcelFile(filename)
+
+        data_feed = pandas.read_excel(excel_file, sheet_feed)
+        self.headers_data_feed = self.IngredientProperties(*(list(data_feed)))
+
+        self.data_available_feed = pandas.read_excel(excel_file, sheet_scenario)
+        self.headers_available_feed = self.ScenarioFeedProperties(*(list(self.data_available_feed)))
+
+        filter_ingredients_ids = \
+            self.data_available_feed.filter(items=[self.headers_available_feed.s_ID]).values
+        self.data_feed_scenario = self.filter_column(data_feed,
+                                                     self.headers_data_feed.s_ID,
+                                                     unwrap_list(filter_ingredients_ids))
+        if len(self.data_feed_scenario) != len(filter_ingredients_ids):
+            raise Exception("Inconsistent data:\n"
+                            "One or more ingredients in SCENARIO could not be found on INGREDIENTS.\n"
+                            "{0}\n\n{1}".format(unwrap_list(filter_ingredients_ids), self.data_feed_scenario))
+
+        self.data_scenario = pandas.read_excel(excel_file, sheet_cattle)
+        self.headers_data_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
+
     @staticmethod
     def filter_column(data_frame, col_name, val):
         """ Filter elements in data_frame where col_name == val or in [val]"""
@@ -163,36 +193,6 @@ class Data:
         elements = data_frame2.filter(items=[col_name]).get_values()
         ds = data_frame1.mask(col_name, unwrap_list(elements))
         return ds
-
-    def __init__(self,
-                 filename,
-                 sheet_feed,
-                 sheet_scenario,
-                 sheet_cattle):
-        """
-        Read excel file
-        I know, I know, shouldn't be hardcoded, one day I will fix that
-        """
-        excel_file = pandas.ExcelFile(filename)
-
-        data_feed = pandas.read_excel(excel_file, sheet_feed)
-        self.headers_data_feed = self.IngredientProperties(*(list(data_feed)))
-
-        self.data_available_feed = pandas.read_excel(excel_file, sheet_scenario)
-        self.headers_available_feed = self.ScenarioFeedProperties(*(list(self.data_available_feed)))
-
-        filter_ingredients_ids = \
-            self.data_available_feed.filter(items=[self.headers_available_feed.s_ID]).values
-        self.data_feed_scenario = self.filter_column(data_feed,
-                                                     self.headers_data_feed.s_ID,
-                                                     unwrap_list(filter_ingredients_ids))
-        if len(self.data_feed_scenario) != len(filter_ingredients_ids):
-            raise Exception("Inconsistent data:\n"
-                            "One or more ingredients in SCENARIO could not be found on INGREDIENTS.\n"
-                            "{0}\n\n{1}".format(unwrap_list(filter_ingredients_ids), self.data_feed_scenario))
-
-        self.data_scenario = pandas.read_excel(excel_file, sheet_cattle)
-        self.headers_data_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
 
     @staticmethod
     def store_output(results_dict, filename="output.xlsx"):

@@ -5,7 +5,7 @@ import logging
 
 ds = None
 
-ingredients, h_ingredients, available_feed, h_available_feed, scenarios, h_scenarios = [None for i in range(6)]
+ingredients, h_ingredients, available_feed, h_available_feed = [None for i in range(4)]
 
 cnem_lb, cnem_ub = 0.8, 3
 
@@ -154,8 +154,8 @@ class Model:
         diet.set_sense(sense="max")
 
         x_vars = list(diet.add_variables(obj=self.cost_obj_vector,
-                                         lb=[0] * len(self.cost_vector),
-                                         ub=[1] * len(self.cost_vector),
+                                         lb=ds.get_column_data(available_feed, h_available_feed.s_min),
+                                         ub=ds.get_column_data(available_feed, h_available_feed.s_max),
                                          names=self._var_names_x))
 
         "Constraint: sum(x a) == CNEm"

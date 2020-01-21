@@ -17,7 +17,6 @@ except ModuleNotFoundError as e:
 
 optimizers = ["CPLEX", "HiGHS"]
 SOLVER = None
-model = None
 
 
 def config(slv):
@@ -29,15 +28,15 @@ def config(slv):
 
 
 class Optimizer:
+    model = None
 
     def __init__(self, optimizer=None):
-        global model
         if SOLVER == "CPLEX":
-            model = cplex.Cplex()
+            self.model = cplex.Cplex()
         if SOLVER == "HiGHS":
             highs_solver.config()
-            model = highs_solver.Model()
-        obj_methods = [method_name for method_name in dir(model) if callable(getattr(model, method_name))]
+            self.model = highs_solver.Model()
+        obj_methods = [method_name for method_name in dir(self.model) if callable(getattr(self.model, method_name))]
         print()
 
     def set_solver(self, solver):
@@ -47,237 +46,237 @@ class Optimizer:
         global SOLVER
         SOLVER = solver
 
-    # MODEL CONSTRUCTION
-    @staticmethod
-    def set_sense(**kwargs):
+    # self.model CONSTRUCTION
+
+    def set_sense(self, **kwargs):
         """
         :param kwargs : {"sense":["max", "min"]}
                 Defines objective direction
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            option = {"max": model.objective.sense.maximize,
-                      "min": model.objective.sense.minimize}
-            model.objective.set_sense(option[kwargs["sense"]])
+            option = {"max": self.model.objective.sense.maximize,
+                      "min": self.model.objective.sense.minimize}
+            self.model.objective.set_sense(option[kwargs["sense"]])
         elif SOLVER == "HiGHS":
-            model.set_sense(kwargs["sense"])
+            self.model.set_sense(kwargs["sense"])
 
-    @staticmethod
-    def add_variables(**kwargs):
+
+    def add_variables(self, **kwargs):
         """
         :param kwargs : CPLEX{"obj":list, "lb": list, "ub": list, "names": list}
                 Defines variables
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            variables = model.variables.add(obj=kwargs["obj"],
+            variables = self.model.variables.add(obj=kwargs["obj"],
                                             lb=kwargs["lb"],
                                             ub=kwargs["ub"],
                                             names=kwargs["names"])
             return variables
         elif SOLVER == "HiGHS":
-            variables = model.add_variables(obj=kwargs["obj"],
+            variables = self.model.add_variables(obj=kwargs["obj"],
                                             lb=kwargs["lb"],
                                             ub=kwargs["ub"],
                                             names=kwargs["names"])
             return variables
 
-    @staticmethod
-    def add_constraint(**kwargs):
+
+    def add_constraint(self, **kwargs):
         """
         :param kwargs : CPLEX{"names":list, "lin_expr": list, "rhs": list, "senses": list}
                 Create constraint
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            model.linear_constraints.add(names=kwargs["names"],
+            self.model.linear_constraints.add(names=kwargs["names"],
                                          lin_expr=kwargs["lin_expr"],
                                          rhs=kwargs["rhs"],
                                          senses=kwargs["senses"]
                                          )
         elif SOLVER == "HiGHS":
-            model.add_constraint(names=kwargs["names"],
+            self.model.add_constraint(names=kwargs["names"],
                                  lin_expr=kwargs["lin_expr"],
                                  rhs=kwargs["rhs"],
                                  senses=kwargs["senses"]
                                  )
 
-    # CHANGING CURRENT MODEL
-    @staticmethod
-    def set_constraint_rhs(seq_of_pairs):
+    # CHANGING CURRENT self.model
+
+    def set_constraint_rhs(self, seq_of_pairs):
         """
         :param seq_of_pairs: tuple with constraint names and values
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            model.linear_constraints.set_rhs(seq_of_pairs)
+            self.model.linear_constraints.set_rhs(seq_of_pairs)
         elif SOLVER == "HiGHS":
-            model.set_constraint_rhs(seq_of_pairs)
+            self.model.set_constraint_rhs(seq_of_pairs)
 
-    @staticmethod
-    def set_objective_function(objective_vector):
+
+    def set_objective_function(self, objective_vector):
         """
         :param objective_vector: list with floats
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            model.objective.set_linear(objective_vector)
+            self.model.objective.set_linear(objective_vector)
         elif SOLVER == "HiGHS":
-            model.set_objective_function(objective_vector)
+            self.model.set_objective_function(objective_vector)
 
     # AUXILIARY FUNCTIONS
-    @staticmethod
-    def get_constraints_names():
+
+    def get_constraints_names(self):
         """
         :return: list with constraint names
         """
         if SOLVER == "CPLEX":
-            return model.linear_constraints.get_names()
+            return self.model.linear_constraints.get_names()
         elif SOLVER == "HiGHS":
-            return model.get_constraints_names()
+            return self.model.get_constraints_names()
 
-    @staticmethod
-    def get_constraints_rhs(constraints):
+
+    def get_constraints_rhs(self, constraints):
         """
         :type constraints: list with constraint names
         :return: list with constraint rhs
         """
         if SOLVER == "CPLEX":
-            return model.linear_constraints.get_rhs(constraints)
+            return self.model.linear_constraints.get_rhs(constraints)
         elif SOLVER == "HiGHS":
-            return model.get_constraints_rhs(constraints)
+            return self.model.get_constraints_rhs(constraints)
 
-    @staticmethod
-    def get_variable_names():
+
+    def get_variable_names(self):
         """
         :return: list with variable names
         """
         if SOLVER == "CPLEX":
-            return model.variables.get_names()
+            return self.model.variables.get_names()
         elif SOLVER == "HiGHS":
-            return model.get_variable_names()
+            return self.model.get_variable_names()
 
     # SOLVING AND RESULTS
-    @staticmethod
-    def solve():
-        """Solve model"""
-        global model
-        if SOLVER == "CPLEX":
-            model.solve()
-        elif SOLVER == "HiGHS":
-            model.solve()
 
-    @staticmethod
-    def feasopt():
-        """Relax the constraints"""
-        global model
+    def solve(self):
+        """Solve self.model"""
+        
         if SOLVER == "CPLEX":
-            model.feasopt.linear_constraints()
+            self.model.solve()
+        elif SOLVER == "HiGHS":
+            self.model.solve()
+
+
+    def feasopt(self):
+        """Relax the constraints"""
+        
+        if SOLVER == "CPLEX":
+            self.model.feasopt.linear_constraints()
         elif SOLVER == "HiGHS":
             raise RuntimeError("Chosen solver <{0}> has no method to execute {1}.".format(
                 SOLVER, "feasopt"
             ))
 
-    @staticmethod
-    def get_solution_status():
-        """Status Solution"""
-        global model
-        if SOLVER == "CPLEX":
-            return model.solution.get_status_string()
-        elif SOLVER == "HiGHS":
-            return model.get_solution_status()
 
-    @staticmethod
-    def get_solution_vec():
+    def get_solution_status(self):
+        """Status Solution"""
+        
+        if SOLVER == "CPLEX":
+            return self.model.solution.get_status_string()
+        elif SOLVER == "HiGHS":
+            return self.model.get_solution_status()
+
+
+    def get_solution_vec(self):
         """Solution vector respective to the variables
         :rtype: list
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            return model.solution.get_values()
+            return self.model.solution.get_values()
         elif SOLVER == "HiGHS":
-            return model.get_solution_vec()
+            return self.model.get_solution_vec()
 
-    @staticmethod
-    def get_solution_obj():
+
+    def get_solution_obj(self):
         """
         :return: objective function value after solve
         :rtype: float
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            return model.solution.get_objective_value()
+            return self.model.solution.get_objective_value()
         elif SOLVER == "HiGHS":
-            return model.get_solution_obj()
+            return self.model.get_solution_obj()
 
-    @staticmethod
-    def get_solution_activity_levels(constraints):
+
+    def get_solution_activity_levels(self, constraints):
         """
         :type constraints: list with constraint names
         :return: float, objective function value after solve
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            return model.solution.get_activity_levels(constraints)
+            return self.model.solution.get_activity_levels(constraints)
         elif SOLVER == "HiGHS":
-            return model.get_solution_activity_levels(constraints)
+            return self.model.get_solution_activity_levels(constraints)
 
     # DUAL PROBLEM
-    @staticmethod
-    def get_dual_reduced_costs():
+
+    def get_dual_reduced_costs(self):
         """
         :return: list, reduced costs
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            return model.solution.get_reduced_costs()
+            return self.model.solution.get_reduced_costs()
         elif SOLVER == "HiGHS":
-            return model.get_dual_reduced_costs()
+            return self.model.get_dual_reduced_costs()
 
-    @staticmethod
-    def get_dual_values():
+
+    def get_dual_values(self):
         """
         :return: list, dual variables values
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            return model.solution.get_dual_values()
+            return self.model.solution.get_dual_values()
         elif SOLVER == "HiGHS":
-            return model.get_dual_values()
+            return self.model.get_dual_values()
 
-    @staticmethod
-    def get_dual_linear_slacks():
+
+    def get_dual_linear_slacks(self):
         """
         :return: list, linear slacks of constraints
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            return model.solution.get_linear_slacks()
+            return self.model.solution.get_linear_slacks()
         elif SOLVER == "HiGHS":
-            return model.get_dual_linear_slacks()
+            return self.model.get_dual_linear_slacks()
 
     # DEBUGGING PURPOSES
-    @staticmethod
-    def write_lp(**kwargs):
+
+    def write_lp(self, **kwargs):
         """
         :param kwargs: name and filetype (extension)
         :type kwargs:[str, str]
-        :return: void, write lp model in txt file
+        :return: void, write lp self.model in txt file
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            model.write(kwargs["name"])
+            self.model.write(kwargs["name"])
         elif SOLVER == "HiGHS":
-            model.write(kwargs["name"])
+            self.model.write(kwargs["name"])
 
-    @staticmethod
-    def write_solution(file_name):
+
+    def write_solution(self, file_name):
         """
         :type file_name: str
         :return: void, write solution in xml file
         """
-        global model
+        
         if SOLVER == "CPLEX":
-            model.solution.write(file_name)
+            self.model.solution.write(file_name)
         elif SOLVER == "HiGHS":
-            model.write_solution(file_name)
+            self.model.write_solution(file_name)

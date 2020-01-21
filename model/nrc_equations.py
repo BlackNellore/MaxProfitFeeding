@@ -3,7 +3,7 @@ import numpy as np
 
 def swg(v_cneg, v_dmi, cnem, v_nem, sbw, linear_factor):
     """ Shrunk Weight Gain """
-    return linear_factor * 0.87 * (v_dmi - v_nem/cnem) * v_cneg / np.power(sbw, 0.6836)
+    return 13.91 * linear_factor * (v_dmi - v_nem/cnem) * v_cneg / np.power(sbw, 0.6836)
 
 
 def swg_const(v_dmi, cnem, v_nem, sbw, linear_factor):
@@ -11,7 +11,7 @@ def swg_const(v_dmi, cnem, v_nem, sbw, linear_factor):
     DEBUG PURPOSES:
     Constant parameter of SWG equation
     """
-    return linear_factor * 0.87 * (v_dmi - v_nem / cnem) / np.power(sbw, 0.6836)
+    return 13.91 * linear_factor * (v_dmi - v_nem / cnem) / np.power(sbw, 0.6836)
 
 
 def dmi(cnem, sbw):
