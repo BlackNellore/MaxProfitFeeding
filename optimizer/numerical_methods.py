@@ -13,7 +13,7 @@ class Searcher:
     _status = Status.EMPTY
     _solutions = None
 
-    def __init__(self, model, obj_func_key="obj_profit", pre_id=""):
+    def __init__(self, model, obj_func_key="obj_func", pre_id=""):
         # if isinstance(model, type(Model)):
         #     error_message = "The parsed model is not acceptable." \
         #                     " Item must be a lpmodel.Model() instance, type found: {0}".format(type(model))

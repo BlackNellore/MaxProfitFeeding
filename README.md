@@ -1,6 +1,17 @@
 # MaxProfitFeeding
 Diet optimization model for beef cattle based on "Nutritional Requirements for Beef Cattle" 8th Ed. (NASEM, 2016).
 
+This model requires only the available feedstuff and animal's characteristics to compute a maximum profit diet.
+We use feestuff properties from NASEM (2016). This work is based on a theoretical framework and in no way replace an appropriate nutritional analysis.
+Thus, we do not hold any responsibility for applications of this work in livestock.
+Always consult a veterinary before changing the feed composition for your herd.
+
+This model is part of a PhD project at the University of Edinburgh and a thematic project funded by FAPESP.
+
+
+####References
+FAPESP project Title: "Sugarcane - Livestock Integration: Modeling and Optimization", FAPESP Project Number:  2017/11523-5
+
 NASEM - National Academies of Sciences, Engineering, and Medicine 2016. Nutrient Requirements of Beef Cattle, 8th Revised Edition. National Academies Press, Washington, D.C.
 
 
@@ -35,9 +46,13 @@ NOTE: Linear programming solver [HiGHS](https://highs.dev) distributed along.
 
 ### Running
 1. Adjust your input in the file **"./input.xlsx"**: 
-    1. Sheet "Feeds": Choose the available feeds setting the ID, it will automatically retrieve the name from sheet "FeedLibrary" (NASEM, 2016). Set minimum and maximum concentration allowed (between 0 and 1), and feed cost \[US$/kg\].
+    1. Sheet "Feeds": Choose the available feeds setting the ID, it will automatically retrieve the name from sheet "FeedLibrary" (NASEM, 2016).
+    Set minimum and maximum concentration allowed (between 0 and 1), and feed cost \[US$/kg\].
+    The column "Feed Scenario" aggregates all feedstuff that belong to a particular scenario.
+    This index will be matched with the one in the sheet "Scenario"
     2. Sheet "Scenario":
         * ID: Scenario ID \[int\]
+        * Feed Scenario: Define with feed scenario should be match in the sheet "Feeds" \[int\]
         * Breed: Breed Name (does not affect result)
         * SBW: Shrunk Bodyweight \[100; 800\]
         * BCS: Body Condition Score \[0; 9\]
@@ -47,7 +62,7 @@ NOTE: Linear programming solver [HiGHS](https://highs.dev) distributed along.
         * a2: 0 if not considering acclimatization factor, check NASEM (2016) otherwise
         * PH: Rumen desired pH
         * Selling Price: Cattle Selling Price per \[U$/kg\]
-        * Linearization factor: 
+        * Linearization factor: an coefficient to adjust nonlinear SWG by a line. 
         * Algorithm: BF - Brute Force; GSS - Golden Section Search
         * Identifier: String to name sheets when writing results
         * LB: Concentration of Net Energy for Maintenance (CNEm) \[Mcal/kg\] lower bound (suggestion: 0.8)

@@ -13,8 +13,8 @@ bigM = 100000
 
 
 class Model:
-    p_id, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
-        p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_lca = [None for i in range(17)]
+    p_id, p_feed_scenario, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
+    p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_obj = [None for i in range(18)]
 
     _diet = None
     _p_mpm = None
@@ -69,14 +69,15 @@ class Model:
 
         sol_id = {"Problem_ID": problem_id}
         sol = dict(zip(diet.get_variable_names(), diet.get_solution_vec()))
-        sol["obj_profit"] = diet.get_solution_obj()
+        sol["obj_func"] = diet.get_solution_obj()
         sol["obj_cost"] = 0
         sol["factor"] = (self._p_dmi - self._p_nem / self._p_cnem)
         sol["CNEg"] = 0
+        sol["obj_revenue"] = 0
         for i in range(len(self.cost_vector)):
             sol["CNEg"] += self.neg_vector[i] * diet.get_solution_vec()[i]
-            sol["obj_cost"] += diet.get_solution_vec()[i] * self.cost_vector[i]
-        sol["obj_cost"] *= self._p_dmi
+            sol["obj_cost"] += diet.get_solution_vec()[i] * self.expenditure_obj_vector[i]
+            sol["obj_revenue"] += diet.get_solution_vec()[i] * self.revenue_obj_vector[i]
 
         p_swg = nrc.swg(sol["CNEg"], self._p_dmi, self._p_cnem, self._p_nem, self.p_sbw, self.p_linearization_factor)
         params = dict(zip(["CNEm", "MPm", "DMI", "NEm", "SWG", "peNDF"],
@@ -86,9 +87,9 @@ class Model:
         sol_rhs = dict(zip(["{}_rhs".format(constraint) for constraint in self.constraints_names],
                            diet.get_constraints_rhs(self.constraints_names)))
         sol_red_cost = dict(zip(["{}_red_cost".format(var) for var in diet.get_variable_names()],
-                                diet.get_dual_reduced_costs()))
+                                diet.get_dual_values()))
         sol_dual = dict(zip(["{}_dual".format(const) for const in diet.get_constraints_names()],
-                            diet.get_dual_values()))
+                            diet.get_dual_reduced_costs()))
         sol_slack = dict(zip(["{}_slack".format(const) for const in diet.get_constraints_names()],
                              diet.get_dual_linear_slacks()))
         sol_obj_cost = dict(zip(["{}_obj_cneg".format(var) for var in diet.get_variable_names()],
@@ -105,6 +106,8 @@ class Model:
     neg_vector = None
     cost_obj_vector = None
     constraints_names = None
+    revenue_obj_vector = None
+    expenditure_obj_vector = None
 
     def __cast_data(self, out_ds, parameters):
         """Retrieve parameters data from table. See data_handler.py for more"""
@@ -113,24 +116,30 @@ class Model:
         global h_ingredients
         global available_feed
         global h_available_feed
-        global scenarios
-        global h_scenarios
+        # global scenarios
+        # global h_scenarios
 
         ds = out_ds
 
+        [self.p_id, self.p_feed_scenario, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex,
+         self.p_a2, self.p_ph,
+         self.p_selling_price, self.p_linearization_factor,
+         self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters.values()
+
         ingredients = ds.data_feed_scenario
         h_ingredients = ds.headers_data_feed
-        available_feed = ds.data_available_feed
         h_available_feed = ds.headers_available_feed
-        scenarios = ds.data_scenario
-        h_scenarios = ds.headers_data_scenario
+        available_feed = ds.filter_column(ds.data_available_feed,
+                                          ds.headers_available_feed.s_feed_scenario,
+                                          self.p_feed_scenario)
 
-        self.n_ingredients = available_feed.last_valid_index()
+        self.n_ingredients = available_feed.shape[0]
         self.cost_vector = ds.get_column_data(available_feed, h_available_feed.s_feed_cost)
+        dm_af_coversion = ds.get_column_data(ingredients, h_ingredients.s_DM)
+        for i in range(len(self.cost_vector)):
+            self.cost_vector[i] /= dm_af_coversion[i]
         self.neg_vector = ds.get_column_data(ingredients, h_ingredients.s_NEga)
-        [self.p_id, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph,
-         self.p_selling_price, self.p_linearization_factor,
-         self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_lca] = parameters.values()
+
 
     def __compute_parameters(self):
         """Compute parameters variable with CNEm"""
@@ -139,16 +148,32 @@ class Model:
                                    self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph)
 
         self.cost_obj_vector = self.cost_vector.copy()
+        self.revenue_obj_vector = self.cost_vector.copy()
+        self.expenditure_obj_vector = self.cost_vector.copy()
+        swg = []
         for i in range(len(self.cost_vector)):
-            self.cost_obj_vector[i] = \
-                self.p_selling_price * nrc.swg(self.neg_vector[i], self._p_dmi, self._p_cnem,
-                                               self._p_nem, self.p_sbw, self.p_linearization_factor) \
-                - self.cost_vector[i] * self._p_dmi
+            swg.append(nrc.swg(self.neg_vector[i], self._p_dmi, self._p_cnem,
+                                               self._p_nem, self.p_sbw, self.p_linearization_factor))
+            self.revenue_obj_vector[i] = \
+                self.p_selling_price * swg[i]
+            self.expenditure_obj_vector[i] = self.cost_vector[i] * self._p_dmi
+        r = [self.revenue_obj_vector[i] - self.expenditure_obj_vector[i] for i in range(len(self.revenue_obj_vector))]
+        if self.p_obj == "MaxProfit":
+            for i in range(len(self.cost_vector)):
+                self.cost_obj_vector[i] = self.revenue_obj_vector[i] - self.expenditure_obj_vector[i]
+        elif self.p_obj == "MinCost":
+            for i in range(len(self.cost_vector)):
+                self.cost_obj_vector[i] = - self.expenditure_obj_vector[i]
+        elif self.p_obj == "MaxProfitSWG":
+            for i in range(len(self.cost_vector)):
+                if swg[i] == 0:
+                    swg[i] = 1/bigM
+                self.cost_obj_vector[i] = (self.revenue_obj_vector[i] - self.expenditure_obj_vector[i])/swg[i]
 
     def __build_model(self):
         """Build model (initially based on CPLEX 12.8.1)"""
         self._diet = optimizer.Optimizer()
-        self._var_names_x = ["x" + str(j) for j in range(self.n_ingredients + 1)]
+        self._var_names_x = ["x" + str(j) for j in range(self.n_ingredients)]
 
         diet = self._diet
         diet.set_sense(sense="max")

@@ -42,6 +42,7 @@ class Data:
     # Sheet Cattle
     class ScenarioParameters(NamedTuple):
         s_id: str
+        s_feed_scenario: str
         s_breed: str
         s_sbw: str
         s_bcs: str
@@ -57,10 +58,11 @@ class Data:
         s_lb: str
         s_ub: str
         s_tol: str
-        s_lca: str
+        s_obj: str
 
     # Sheet Feeds
     class ScenarioFeedProperties(NamedTuple):
+        s_feed_scenario: str
         s_ID: str
         s_min: str
         s_max: str
@@ -139,22 +141,24 @@ class Data:
         """
         excel_file = pandas.ExcelFile(filename)
 
+        # FeedLibrary
         data_feed = pandas.read_excel(excel_file, sheet_feed)
         self.headers_data_feed = self.IngredientProperties(*(list(data_feed)))
 
+        # Feeds scenarios
         self.data_available_feed = pandas.read_excel(excel_file, sheet_scenario)
         self.headers_available_feed = self.ScenarioFeedProperties(*(list(self.data_available_feed)))
 
+        # Filters feed library with the feeds on the scenario
         filter_ingredients_ids = \
             self.data_available_feed.filter(items=[self.headers_available_feed.s_ID]).values
         self.data_feed_scenario = self.filter_column(data_feed,
                                                      self.headers_data_feed.s_ID,
                                                      unwrap_list(filter_ingredients_ids))
-        if len(self.data_feed_scenario) != len(filter_ingredients_ids):
-            raise Exception("Inconsistent data:\n"
-                            "One or more ingredients in SCENARIO could not be found on INGREDIENTS.\n"
-                            "{0}\n\n{1}".format(unwrap_list(filter_ingredients_ids), self.data_feed_scenario))
 
+        # TODO Check if all ingridients exist in the library.
+
+        # Sheet Scenario
         self.data_scenario = pandas.read_excel(excel_file, sheet_cattle)
         self.headers_data_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
 

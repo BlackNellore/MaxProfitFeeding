@@ -94,7 +94,7 @@ def initialize(special_msg):
     logging.info("\n\n")
     logging.info("\n\n{}".format(scenarios))
 
-    ingredients.index = range(available_feed.last_valid_index() + 1)
+    # ingredients.index = range(available_feed.last_valid_index() + 1)
 
 
 if __name__ == "__main__":
