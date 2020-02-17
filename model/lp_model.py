@@ -1,11 +1,18 @@
 """ Mathematical model """
 from optimizer import optimizer
-from model import nrc_equations as nrc
+from model.nrc_equations import NRC_eq as nrc
+from model import data_handler
+import pandas
 import logging
 
-ds = None
 
-ingredients, h_ingredients, available_feed, h_available_feed = [None for i in range(4)]
+ds: data_handler.Data = None
+ingredients: pandas.DataFrame = None
+h_ingredients: data_handler.Data.IngredientProperties = None
+available_feed: pandas.DataFrame = None
+h_available_feed: data_handler.Data.ScenarioFeedProperties = None
+scenarios: pandas.DataFrame = None
+h_scenarios: data_handler.Data.ScenarioParameters = None
 
 cnem_lb, cnem_ub = 0.8, 3
 
@@ -139,7 +146,6 @@ class Model:
         for i in range(len(self.cost_vector)):
             self.cost_vector[i] /= dm_af_coversion[i]
         self.neg_vector = ds.get_column_data(ingredients, h_ingredients.s_NEga)
-
 
     def __compute_parameters(self):
         """Compute parameters variable with CNEm"""

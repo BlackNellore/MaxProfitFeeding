@@ -39,6 +39,7 @@ def unwrap_list(nested_list):
 class Data:
     pandas.DataFrame.mask = mask
 
+
     # Sheet Cattle
     class ScenarioParameters(NamedTuple):
         s_id: str
@@ -130,6 +131,14 @@ class Data:
         s_Vit_D: str
         s_Vit_E: str
 
+    headers_data_feed: IngredientProperties = None
+    data_feed: pandas.DataFrame = None
+    data_feed_scenario: pandas.DataFrame = None
+    data_available_feed: pandas.DataFrame = None
+    headers_available_feed: ScenarioFeedProperties = None
+    data_scenario: pandas.DataFrame = None
+    headers_data_scenario: ScenarioParameters = None
+
     def __init__(self,
                  filename,
                  sheet_feed,
@@ -214,9 +223,4 @@ class Data:
 
 
 if __name__ == "__main__":
-    print("hello data_handler")
-    test_ds = Data(filename="Input.xlsx",
-                   sheet_feed="FeedLibrary",
-                   sheet_scenario="Feeds",
-                   sheet_cattle="Scenario"
-                   )
+    pass
