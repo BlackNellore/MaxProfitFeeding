@@ -9,7 +9,7 @@ Always consult a veterinary before changing the feed composition for your herd.
 This model is part of a PhD project at the University of Edinburgh and a thematic project funded by FAPESP.
 
 
-####References
+#### References
 FAPESP project Title: "Sugarcane - Livestock Integration: Modeling and Optimization", FAPESP Project Number:  2017/11523-5
 
 NASEM - National Academies of Sciences, Engineering, and Medicine 2016. Nutrient Requirements of Beef Cattle, 8th Revised Edition. National Academies Press, Washington, D.C.
