@@ -110,7 +110,7 @@ def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, 
             row_value, row_dual,
             col_basis, row_basis, ctypes.byref(ctypes.c_int(return_val)))
     except Exception as e:
-        logging.error("An error occurred when executing HiGHS: {}".format(str(e)))
+        logging.error("An error occurred when executing HiGHS, probably infeasible: {}".format(str(e)))
         return None
     return retcode, list(col_value), list(col_dual), list(row_value), list(row_dual), list(col_basis), list(row_basis)
 
@@ -354,7 +354,7 @@ class Model:
             slacks.append(self.solution.constraints[cs_name]["slack"])
         return slacks
 
-    def write(self, **kwargs):
+    def write(self, filename):
         # Pffffffffff, no way I am implementing that
         pass
 

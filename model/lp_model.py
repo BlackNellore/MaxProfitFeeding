@@ -1,25 +1,29 @@
 """ Mathematical model """
 from optimizer import optimizer
-from model.nrc_equations import NRC_eq as nrc
-from model import data_handler
 import pandas
+from model import data_handler
+from model.nrc_equations import NRC_eq as nrc
 import logging
-
-
-ds: data_handler.Data = None
-ingredients: pandas.DataFrame = None
-h_ingredients: data_handler.Data.IngredientProperties = None
-available_feed: pandas.DataFrame = None
-h_available_feed: data_handler.Data.ScenarioFeedProperties = None
-scenarios: pandas.DataFrame = None
-h_scenarios: data_handler.Data.ScenarioParameters = None
+from model.data_handler import Data
 
 cnem_lb, cnem_ub = 0.8, 3
 
 bigM = 100000
 
 
+def model_factory(ds, parameters):
+    return Model(ds, parameters)
+
+
 class Model:
+    ds: data_handler.Data = None
+    headers_feed_lib: data_handler.Data.IngredientProperties = None  # Feed Library
+    data_feed_lib: pandas.DataFrame = None  # Feed Library
+    data_feed_scenario: pandas.DataFrame = None  # Feeds
+    headers_feed_scenario: data_handler.Data.ScenarioFeedProperties = None  # Feeds
+    data_scenario: pandas.DataFrame = None  # Scenario
+    headers_scenario: data_handler.Data.ScenarioParameters = None  # Scenario
+
     p_id, p_feed_scenario, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
     p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_obj = [None for i in range(18)]
 
@@ -39,8 +43,7 @@ class Model:
     prefix_id = ""
 
     def __init__(self, out_ds, parameters):
-        self.__cast_data(out_ds, parameters)
-        pass
+        self._cast_data(out_ds, parameters)
 
     def run(self, p_id, p_cnem):
         """Either build or update model, solve ir and return solution = {dict xor None}"""
@@ -48,17 +51,17 @@ class Model:
         try:
             self.opt_sol = None
             self._p_cnem = p_cnem
-            self.__compute_parameters()
+            self._compute_parameters()
             if self._diet is None:
-                self.__build_model()
+                self._build_model()
             else:
-                self.__update_model()
-            return self.__solve(p_id)
+                self._update_model()
+            return self._solve(p_id)
         except Exception as e:
             logging.error("An error occurred:\n{}".format(str(e)))
             return None
 
-    def __solve(self, problem_id):
+    def _solve(self, problem_id):
         """Return None if solution is infeasible or Solution dict otherwise"""
         diet = self._diet
         # diet.write_lp(name="CNEm_{}.lp".format(str(self._p_cnem)))
@@ -107,7 +110,7 @@ class Model:
 
         return sol
 
-    # Parameters filled by inner method .__cast_data()
+    # Parameters filled by inner method ._cast_data()
     n_ingredients = None
     cost_vector = None
     neg_vector = None
@@ -116,38 +119,40 @@ class Model:
     revenue_obj_vector = None
     expenditure_obj_vector = None
 
-    def __cast_data(self, out_ds, parameters):
+    def _cast_data(self, out_ds, parameters):
         """Retrieve parameters data from table. See data_handler.py for more"""
-        global ds
-        global ingredients
-        global h_ingredients
-        global available_feed
-        global h_available_feed
-        # global scenarios
-        # global h_scenarios
+        self.ds = out_ds
 
-        ds = out_ds
+        self.data_feed_scenario = self.ds.data_feed_scenario
+        self.headers_feed_scenario = self.ds.headers_feed_scenario
 
-        [self.p_id, self.p_feed_scenario, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex,
-         self.p_a2, self.p_ph,
+
+
+        [self.p_id, self.p_feed_scenario, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph,
          self.p_selling_price, self.p_linearization_factor,
          self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters.values()
 
-        ingredients = ds.data_feed_scenario
-        h_ingredients = ds.headers_data_feed
-        h_available_feed = ds.headers_available_feed
-        available_feed = ds.filter_column(ds.data_available_feed,
-                                          ds.headers_available_feed.s_feed_scenario,
-                                          self.p_feed_scenario)
+        headers_feed_scenario = self.ds.headers_feed_scenario
+        self.data_feed_scenario = self.ds.filter_column(self.ds.data_feed_scenario,
+                                                        self.ds.headers_feed_scenario.s_feed_scenario,
+                                                        self.p_feed_scenario)
+        self.ingredient_ids = list(
+            self.ds.get_column_data(self.data_feed_scenario, self.headers_feed_scenario.s_ID, int))
 
-        self.n_ingredients = available_feed.shape[0]
-        self.cost_vector = ds.get_column_data(available_feed, h_available_feed.s_feed_cost)
-        dm_af_coversion = ds.get_column_data(ingredients, h_ingredients.s_DM)
+        self.headers_feed_lib = self.ds.headers_feed_lib
+        self.data_feed_lib = self.ds.filter_column(self.ds.data_feed_lib, self.headers_feed_lib.s_ID,
+                                                   self.ingredient_ids)
+
+        self.cost_vector = self.ds.get_column_data(self.data_feed_scenario, self.headers_feed_scenario.s_feed_cost)
+        self.neg_vector = self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_NEga)
+        self.n_ingredients = self.data_feed_scenario.shape[0]
+        self.cost_vector = self.ds.get_column_data(self.data_feed_scenario, headers_feed_scenario.s_feed_cost)
+        dm_af_coversion = self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_DM)
         for i in range(len(self.cost_vector)):
             self.cost_vector[i] /= dm_af_coversion[i]
-        self.neg_vector = ds.get_column_data(ingredients, h_ingredients.s_NEga)
+        self.neg_vector = self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_NEga)
 
-    def __compute_parameters(self):
+    def _compute_parameters(self):
         """Compute parameters variable with CNEm"""
         self._p_mpm, self._p_dmi, self._p_nem, self._p_pe_ndf = \
             nrc.get_all_parameters(self._p_cnem, self.p_sbw, self.p_bcs,
@@ -159,7 +164,7 @@ class Model:
         swg = []
         for i in range(len(self.cost_vector)):
             swg.append(nrc.swg(self.neg_vector[i], self._p_dmi, self._p_cnem,
-                                               self._p_nem, self.p_sbw, self.p_linearization_factor))
+                               self._p_nem, self.p_sbw, self.p_linearization_factor))
             self.revenue_obj_vector[i] = \
                 self.p_selling_price * swg[i]
             self.expenditure_obj_vector[i] = self.cost_vector[i] * self._p_dmi
@@ -175,8 +180,9 @@ class Model:
                 if swg[i] == 0:
                     swg[i] = 1/bigM
                 self.cost_obj_vector[i] = (self.revenue_obj_vector[i] - self.expenditure_obj_vector[i])/swg[i]
+        pass
 
-    def __build_model(self):
+    def _build_model(self):
         """Build model (initially based on CPLEX 12.8.1)"""
         self._diet = optimizer.Optimizer()
         self._var_names_x = ["x" + str(j) for j in range(self.n_ingredients)]
@@ -185,18 +191,18 @@ class Model:
         diet.set_sense(sense="max")
 
         x_vars = list(diet.add_variables(obj=self.cost_obj_vector,
-                                         lb=ds.get_column_data(available_feed, h_available_feed.s_min),
-                                         ub=ds.get_column_data(available_feed, h_available_feed.s_max),
+                                         lb=self.ds.get_column_data(self.data_feed_scenario, self.headers_feed_scenario.s_min),
+                                         ub=self.ds.get_column_data(self.data_feed_scenario, self.headers_feed_scenario.s_max),
                                          names=self._var_names_x))
 
         "Constraint: sum(x a) == CNEm"
         diet.add_constraint(names=["CNEm GE"],
-                            lin_expr=[[x_vars, ds.get_column_data(ingredients, h_ingredients.s_NEma)]],
+                            lin_expr=[[x_vars, self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_NEma)]],
                             rhs=[self._p_cnem * 0.999],
                             senses=["G"]
                             )
         diet.add_constraint(names=["CNEm LE"],
-                            lin_expr=[[x_vars, ds.get_column_data(ingredients, h_ingredients.s_NEma)]],
+                            lin_expr=[[x_vars, self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_NEma)]],
                             rhs=[self._p_cnem * 1.001],
                             senses=["L"]
                             )
@@ -207,14 +213,15 @@ class Model:
                             senses=["E"]
                             )
         "Constraint: sum(x a)>= MPm"
-        mpm_list = [nrc.mp(*ds.get_column_data(ds.filter_column(ingredients, h_ingredients.s_ID, val_col),
-                                               [h_ingredients.s_DM,
-                                                h_ingredients.s_TDN,
-                                                h_ingredients.s_CP,
-                                                h_ingredients.s_RUP,
-                                                h_ingredients.s_Forage,
-                                                h_ingredients.s_Fat]))
-                    for val_col in ds.get_column_data(ingredients, h_ingredients.s_ID, int)]
+        mpm_list = [nrc.mp(*self.ds.get_column_data(
+            self.ds.filter_column(self.data_feed_lib, self.headers_feed_lib.s_ID, val_col),
+            [self.headers_feed_lib.s_DM,
+             self.headers_feed_lib.s_TDN,
+             self.headers_feed_lib.s_CP,
+             self.headers_feed_lib.s_RUP,
+             self.headers_feed_lib.s_Forage,
+             self.headers_feed_lib.s_Fat]))
+                    for val_col in self.ingredient_ids]
 
         for i, v in enumerate(mpm_list):
             mpm_list[i] = v - self.neg_vector[i] * (nrc.swg_const(self._p_dmi, self._p_cnem, self._p_nem,
@@ -227,8 +234,8 @@ class Model:
                             senses=["G"]
                             )
 
-        rdp_data = [(1 - ds.get_column_data(ingredients, h_ingredients.s_RUP)[x_index])
-                    * ds.get_column_data(ingredients, h_ingredients.s_CP)[x_index]
+        rdp_data = [(1 - self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_RUP)[x_index])
+                    * self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_CP)[x_index]
                     for x_index in range(len(x_vars))]
 
         "Constraint: RUP: sum(x a) >= 0.125 CNEm"
@@ -240,14 +247,14 @@ class Model:
 
         "Constraint: Fat: sum(x a) <= 0.06 DMI"
         diet.add_constraint(names=["Fat"],
-                            lin_expr=[[x_vars, ds.get_column_data(ingredients, h_ingredients.s_Fat)]],
+                            lin_expr=[[x_vars, self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_Fat)]],
                             rhs=[0.06],
                             senses=["L"]
                             )
 
         "Constraint: peNDF: sum(x a) <= peNDF DMI"
-        pendf_data = [ds.get_column_data(ingredients, h_ingredients.s_NDF)[x_index]
-                      * ds.get_column_data(ingredients, h_ingredients.s_pef)[x_index]
+        pendf_data = [self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_NDF)[x_index]
+                      * self.ds.get_column_data(self.data_feed_lib, self.headers_feed_lib.s_pef)[x_index]
                       for x_index in range(len(x_vars))]
         diet.add_constraint(names=["peNDF"],
                             lin_expr=[[x_vars, pendf_data]],
@@ -258,8 +265,10 @@ class Model:
         # TODO: Put constraint to limit Urea in the diet: sum(x) * DMI <= up_limit
 
         self.constraints_names = diet.get_constraints_names()
+        # diet.write_lp(name="file.lp")
+        pass
 
-    def __update_model(self):
+    def _update_model(self):
         """Update RHS values on the model based on the new CNEm and updated parameters"""
         new_rhs = {
             "CNEm GE": self._p_cnem * 0.999,
