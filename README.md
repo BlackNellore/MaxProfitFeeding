@@ -76,12 +76,16 @@ NOTE: Linear programming solver [HiGHS](https://highs.dev) distributed along.
 
 ## Bonus
 ### Settings
-You can change the file names and other settings in ```config.py```:
+You can change the file names and other settings in ```config.py```.
+Be sure to have headers and sheet names matching in the ```config.py``` and ```input.xlsx```.
 ```
-INPUT_FILE = {'filename': 'input.xlsx',
-              'sheet_feed': "FeedLibrary",
-               'sheet_scenario': "Feeds",
-               'sheet_cattle': "Scenario"}
+INPUT_FILE = {'filename': {'name': 'input.xlsx'},
+              'sheet_feed_lib': {'name': 'Feed Library',
+                                 'headers': [...]},
+              'sheet_feeds': {'name': 'Feeds',
+                              'headers': [...]},
+              'sheet_scenario': {'name': 'Scenario',
+                                 'headers': [...]}}
 OUTPUT_FILE = 'output.xlsx'
 SOLVER = 'HiGHS'
 ```
