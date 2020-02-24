@@ -5,6 +5,7 @@ Good luck!
 """
 #
 import logging
+import cplex
 
 try:
     import cplex

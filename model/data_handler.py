@@ -70,7 +70,7 @@ class Data:
         s_feed_cost: str
         s_name: str
 
-    # Sheet FeedLibrary
+    # Sheet Feed Library
     class IngredientProperties(NamedTuple):
         s_ID: str
         s_FEED: str
@@ -131,45 +131,84 @@ class Data:
         s_Vit_D: str
         s_Vit_E: str
 
-    headers_data_feed: IngredientProperties = None
-    data_feed: pandas.DataFrame = None
-    data_feed_scenario: pandas.DataFrame = None
-    data_available_feed: pandas.DataFrame = None
-    headers_available_feed: ScenarioFeedProperties = None
-    data_scenario: pandas.DataFrame = None
-    headers_data_scenario: ScenarioParameters = None
+
+    headers_feed_lib: IngredientProperties = None  # Feed Library
+    data_feed_lib: pandas.DataFrame = None  # Feed Library
+    data_feed_scenario: pandas.DataFrame = None  # Feeds
+    headers_feed_scenario: ScenarioFeedProperties = None  # Feeds
+    data_scenario: pandas.DataFrame = None  # Scenario
+    headers_scenario: ScenarioParameters = None  # Scenario
 
     def __init__(self,
                  filename,
-                 sheet_feed,
-                 sheet_scenario,
-                 sheet_cattle):
+                 sheet_feed_lib,
+                 sheet_feeds,
+                 sheet_scenario):
         """
         Read excel file
-        I know, I know, shouldn't be hardcoded, one day I will fix that
+        :param filename : {'name'}
+        :param sheet_* : {'name', 'headers'}
         """
-        excel_file = pandas.ExcelFile(filename)
+        excel_file = pandas.ExcelFile(filename['name'])
+        # TODO: Be sure that everything is on the same order
 
-        # FeedLibrary
-        data_feed = pandas.read_excel(excel_file, sheet_feed)
-        self.headers_data_feed = self.IngredientProperties(*(list(data_feed)))
+        # Feed Library Sheet
+        data_feed_lib = pandas.read_excel(excel_file, sheet_feed_lib['name'])
+        self.headers_feed_lib = self.IngredientProperties(*(list(data_feed_lib)))
 
         # Feeds scenarios
-        self.data_available_feed = pandas.read_excel(excel_file, sheet_scenario)
-        self.headers_available_feed = self.ScenarioFeedProperties(*(list(self.data_available_feed)))
+        self.data_feed_scenario = pandas.read_excel(excel_file, sheet_feeds['name'])
+        self.headers_feed_scenario = self.ScenarioFeedProperties(*(list(self.data_feed_scenario)))
 
         # Filters feed library with the feeds on the scenario
         filter_ingredients_ids = \
-            self.data_available_feed.filter(items=[self.headers_available_feed.s_ID]).values
-        self.data_feed_scenario = self.filter_column(data_feed,
-                                                     self.headers_data_feed.s_ID,
-                                                     unwrap_list(filter_ingredients_ids))
+            self.data_feed_scenario.filter(items=[self.headers_feed_scenario.s_ID]).values
+        self.data_feed_lib = self.filter_column(data_feed_lib,
+                                                self.headers_feed_lib.s_ID,
+                                                unwrap_list(filter_ingredients_ids))
 
         # TODO Check if all ingridients exist in the library.
 
         # Sheet Scenario
-        self.data_scenario = pandas.read_excel(excel_file, sheet_cattle)
-        self.headers_data_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
+        self.data_scenario = pandas.read_excel(excel_file, sheet_scenario['name'])
+        self.headers_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
+
+
+        # checking if config.py is consistent with Excel headers
+        check_list = [(sheet_feed_lib, self.headers_feed_lib),
+                      (sheet_feeds, self.headers_feed_scenario),
+                      (sheet_scenario, self.headers_scenario)]
+        try:
+            for sheet in check_list:
+                if sheet[0]['headers'] != [x for x in sheet[1]]:
+                    raise IOError(sheet[0]['name'])
+        except IOError as e:
+            logging.error("Headers in config.py don't match header in Excel file:{}".format(e.args))
+            [self.headers_feed_lib,
+             self.headers_feed_scenario,
+             self.headers_scenario] = [None for i in range(3)]
+            raise IOError(e)
+
+        # Saving info in the log
+        logging.info("\n\nAll data read")
+
+    def datasets(self):
+        """
+        Return datasets
+        :return list : [data_feed_lib, data_feed_scenario, data_scenario, data_lca_lib, data_lca_scenario]
+        """
+        return [self.data_feed_lib,
+                self.data_feed_scenario,
+                self.data_scenario]
+
+    def headers(self):
+        """
+        Return datasets' headers
+        :return list : [headers_feed_lib, headers_feed_scenario, headers_scenario, headers_lca_lib, headers_lca_scenario]
+        """
+        return [self.headers_feed_lib,
+                self.headers_feed_scenario,
+                self.headers_scenario]
 
     @staticmethod
     def filter_column(data_frame, col_name, val):
@@ -223,4 +262,9 @@ class Data:
 
 
 if __name__ == "__main__":
-    pass
+    print("hello data_handler")
+    test_ds = Data(filename="../Input3.xlsx",
+                   sheet_feed_lib="Feed Library",
+                   sheet_feeds="Feeds",
+                   sheet_scenario="Scenario"
+                   )

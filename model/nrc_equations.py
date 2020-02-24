@@ -1,5 +1,6 @@
 import numpy as np
 
+feed_keys = ['f_fat', 'f_CP', 'f_NDF', 'f_starch', 'f_sugars', 'f_oa']
 
 class NRC_eq:
     @staticmethod
@@ -69,28 +70,6 @@ class NRC_eq:
     def pe_ndf(ph_val):
         """Physically Effective Non-Detergent Fiber"""
         return 0.01 * (ph_val - 5.46)/0.038
-
-
-    feed_keys = ['f_fat', 'f_CP', 'f_NDF', 'f_starch', 'f_sugars', 'f_oa']
-
-
-    # TODO: ch4 emissions
-    def ch4_diet(self, feed_properties):
-        test_percentage = 0
-        for i in self.feed_keys:
-            test_percentage += feed_properties[i]
-        if test_percentage > 1:
-            test_percentage = 0.01
-        else:
-            test_percentage = 1
-
-        feed_ge = 0.2389 * (4.15 * (feed_properties['f_NDF'] +
-                                    feed_properties['f_starch'] +
-                                    feed_properties['f_sugars'] +
-                                    feed_properties['f_oa']) +
-                            9.4 * feed_properties['f_fat'] +
-                            5.7 * feed_properties['f_CP']) * test_percentage
-        return {'GE20': (0.065 * feed_ge), 'LE20': (0.03 * feed_ge)}
 
 
 if __name__ == "__main__":

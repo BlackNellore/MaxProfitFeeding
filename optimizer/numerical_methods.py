@@ -79,7 +79,7 @@ class Searcher:
                 return results
 
         except TypeError as e:
-            logging.error("An error occurred in BF method: {}".format(e))
+            logging.error("An error occurred in numerical_method.Searcher.__brute_force method: {}".format(e))
             return None
 
     def golden_section_search(self, lb, ub, p_tol):
