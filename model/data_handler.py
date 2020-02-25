@@ -232,7 +232,10 @@ class Data:
                 return resulting_list
         else:
             ds = data_frame.filter(items=col_name).get_values()
-            return unwrap_list(ds)
+            if ds.shape[0] > 1:
+                return [list(row) for row in list(ds)]
+            else:
+                return unwrap_list(ds)
 
     @staticmethod
     def map_values(headers, vals):
@@ -260,10 +263,27 @@ class Data:
             df.to_excel(writer, sheet_name=sheet_name, columns=[*results[0].keys()])
         writer.save()
 
+    @staticmethod
+    def sort_df(dataframe, col):
+        df: pandas.DataFrame = dataframe.copy()
+        ids = list(df[col])
+        ids.sort()
+        mapping = dict(zip(ids, [i for i in range(len(ids))]))
+        ids = [mapping[id] for id in df[col]]
+        ids = pandas.Index(ids)
+        df = df.set_index(ids).sort_index()
+        return df
+
+    def sorted_column(self, dataFrame, header, base_list, base_header):
+        keys = list(self.get_column_data(dataFrame, base_header))
+        vals = list(self.get_column_data(dataFrame, header))
+        mapping = dict(zip(keys, vals))
+        return [mapping[k] for k in base_list]
+
 
 if __name__ == "__main__":
     print("hello data_handler")
-    test_ds = Data(filename="../Input3.xlsx",
+    test_ds = Data(filename="../Input.xlsx",
                    sheet_feed_lib="Feed Library",
                    sheet_feeds="Feeds",
                    sheet_scenario="Scenario"
