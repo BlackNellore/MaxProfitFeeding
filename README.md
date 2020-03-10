@@ -1,4 +1,4 @@
-# MaxProfitFeeding
+# MaxProfitFeeding (teste jair)
 Diet optimization model for beef cattle based on "Nutritional Requirements for Beef Cattle" 8th Ed. (NASEM, 2016).
 
 This model requires only the available feedstuff and animal's characteristics to compute a maximum profit diet.
