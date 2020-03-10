@@ -174,6 +174,9 @@ class Data:
         self.headers_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
 
 
+        # TODO read Historical Series
+
+
         # checking if config.py is consistent with Excel headers
         check_list = [(sheet_feed_lib, self.headers_feed_lib),
                       (sheet_feeds, self.headers_feed_scenario),

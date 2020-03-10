@@ -1,7 +1,7 @@
 from model import data_handler
 import pandas
 from model.lp_model import model_factory
-from optimizer.numerical_methods import Searcher, Status
+from optimizer.numerical_methods import Searcher, Status, Algorithms
 import logging
 
 INPUT = {}
@@ -27,6 +27,7 @@ class Diet:
         results = {}
         for scenario in data_scenario.values:
             parameters = dict(zip(headers_scenario, scenario))
+            multiobjective = False # adapt to series
 
             logging.info("Current Scenario:")
             logging.info("{}".format(parameters))
@@ -50,16 +51,23 @@ class Diet:
             logging.info("Refinement completed")
             logging.info("Choosing optimization method")
 
+            # TODO Implement Sensitivity Analisis: sensitivity.py
+
             if parameters[headers_scenario.s_algorithm] == "GSS":
-                logging.info("Optimizing with Golden-Section Search algorithm")
-                optimizer.golden_section_search(lb, ub, tol)
+                msg = "Golden-Section Search algorithm"
             elif parameters[headers_scenario.s_algorithm] == "BF":
-                logging.info("Optimizing with Brute Force algorithm")
-                optimizer.brute_force_search(lb, ub, tol)
+                msg = "Brute Force algorithm"
             else:
                 logging.error("Algorithm {} not found, scenario skipped".format(
                     parameters[headers_scenario.s_algorithm]))
                 continue
+            algorithm = Algorithms[parameters[headers_scenario.s_algorithm]]
+            if not multiobjective:
+                logging.info(f'Optimizing with {msg}')
+                optimizer.single_objective(algorithm, lb, ub, tol)
+            else:
+                logging.info(f"Optimizing with multiobjective epsilon-constrained based on {msg}")
+                optimizer.multi_objective(algorithm, lb, ub, tol)
 
             logging.info("Saving solution locally")
             status, solution = optimizer.get_results()

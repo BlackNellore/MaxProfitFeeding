@@ -301,8 +301,6 @@ class Model:
                             senses=["G"]
                             )
 
-        # TODO: Put constraint to limit Urea in the diet: sum(x) * DMI <= up_limit
-
         self.constraints_names = diet.get_constraints_names()
         # diet.write_lp(name="file.lp")
         pass
