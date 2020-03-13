@@ -69,6 +69,7 @@ INPUT_FILE = {'filename': {'name': 'input.xlsx'},
               'sheet_scenario': {'name': 'Scenario',
                                  'headers': ['ID',
                                              'Feed Scenario',
+                                             'Batch',
                                              'Breed',
                                              'SBW',
                                              'BCS',
@@ -84,6 +85,14 @@ INPUT_FILE = {'filename': {'name': 'input.xlsx'},
                                              'LB',
                                              'UB',
                                              'Tol',
-                                             'Obj']}}
+                                             'Obj']},
+              'sheet_batch': {'name': 'Batch',
+                              'headers': ['Batch ID',
+                                          'Filename',
+                                          'Period col',
+                                          'Initial Period',
+                                          'Final Period']}
+
+              }
 OUTPUT_FILE = 'output.xlsx'
 SOLVER = 'HiGHS'
