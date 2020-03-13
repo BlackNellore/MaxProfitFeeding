@@ -44,6 +44,7 @@ class Data:
     class ScenarioParameters(NamedTuple):
         s_id: str
         s_feed_scenario: str
+        s_batch: str
         s_breed: str
         s_sbw: str
         s_bcs: str
@@ -69,6 +70,14 @@ class Data:
         s_max: str
         s_feed_cost: str
         s_name: str
+
+    # Sheet Batchs
+    class BatchParameters(NamedTuple):
+        s_batch_id: str
+        s_file_name: str
+        s_period_col: str
+        s_initial_period: str
+        s_final_period: str
 
     # Sheet Feed Library
     class IngredientProperties(NamedTuple):
@@ -131,19 +140,22 @@ class Data:
         s_Vit_D: str
         s_Vit_E: str
 
-
     headers_feed_lib: IngredientProperties = None  # Feed Library
+    headers_feed_scenario: ScenarioFeedProperties = None  # Feeds
+    headers_scenario: ScenarioParameters = None  # Scenario
+    headers_batch: BatchParameters = None  # Batch
+
     data_feed_lib: pandas.DataFrame = None  # Feed Library
     data_feed_scenario: pandas.DataFrame = None  # Feeds
-    headers_feed_scenario: ScenarioFeedProperties = None  # Feeds
     data_scenario: pandas.DataFrame = None  # Scenario
-    headers_scenario: ScenarioParameters = None  # Scenario
+    data_batch: pandas.DataFrame = None  # Batch
 
     def __init__(self,
                  filename,
                  sheet_feed_lib,
                  sheet_feeds,
-                 sheet_scenario):
+                 sheet_scenario,
+                 sheet_batch):
         """
         Read excel file
         :param filename : {'name'}
@@ -173,14 +185,17 @@ class Data:
         self.data_scenario = pandas.read_excel(excel_file, sheet_scenario['name'])
         self.headers_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
 
+        # Sheet batch
+        self.data_batch = pandas.read_excel(excel_file, sheet_batch['name'])
+        self.headers_batch = self.BatchParameters(*(list(self.data_batch)))
 
         # TODO read Historical Series
-
 
         # checking if config.py is consistent with Excel headers
         check_list = [(sheet_feed_lib, self.headers_feed_lib),
                       (sheet_feeds, self.headers_feed_scenario),
-                      (sheet_scenario, self.headers_scenario)]
+                      (sheet_scenario, self.headers_scenario),
+                      (sheet_batch, self.headers_batch)]
         try:
             for sheet in check_list:
                 if sheet[0]['headers'] != [x for x in sheet[1]]:
@@ -191,6 +206,7 @@ class Data:
              self.headers_feed_scenario,
              self.headers_scenario] = [None for i in range(3)]
             raise IOError(e)
+
 
         # Saving info in the log
         logging.info("\n\nAll data read")
