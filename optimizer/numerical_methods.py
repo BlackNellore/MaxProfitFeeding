@@ -9,23 +9,20 @@ Status = Enum('Status', 'EMPTY READY SOLVED ERROR')
 class Searcher:
     _model: Model = None
     _obj_func_key = None
-    _prefix_id = None
+    _msg = None
+    _batch = False
 
     _status = Status.EMPTY
     _solutions = None
 
-    def __init__(self, model, obj_func_key="obj_func", pre_id=""):
-        # if isinstance(model, type(Model)):
-        #     error_message = "The parsed model is not acceptable." \
-        #                     " Item must be a lpmodel.Model() instance, type found: {0}".format(type(model))
-        #     raise IOError(error_message)
+    def __init__(self, model, batch = False, obj_func_key="obj_func"):
 
         self._model = model
         self._obj_func_key = obj_func_key
         self._solutions = []
         self._status = Status.READY
-        self._prefix_id = pre_id
-        self._model.prefix_id = pre_id
+        self._batch = batch
+        self._model.prefix_id = ""
 
     def refine_bounds(self, lb=0.0, ub=1.0, tol=0.01):
         new_lb = self.refine_bound(lb, ub, direction=1, tol=tol)
@@ -94,7 +91,7 @@ class Searcher:
         """Executes golden-section search algorithm"""
         if self._status != Status.READY:
             self.__clear_searcher()
-        if uncertain_bounds: # TODO
+        if uncertain_bounds:
             lb, ub = self.refine_bounds(lb, ub, 0.001)
             if lb is None:
                 self._status = Status.ERROR
@@ -152,65 +149,25 @@ class Searcher:
                     f, c, b, results, p_id+1, tol, h * inv_phi, c=d, fc=fd)
         except TypeError as e:
             logging.error("An error occurred in GSS method:\n{}".format(e))
+            raise(e)
             return None, None
 
-    def single_objective(self, algorithm, lb, ub, tol):
+    def run_scenario(self, algorithm, lb, ub, tol):
         self.__clear_searcher()
-        self._solutions = []
-        self._solutions_multiobjective = []
-        self._prefix_id = f"single objective lb={lb}, ub={ub}, algorithm={algorithm}"
+        self._msg = f"single objective lb={lb}, ub={ub}, algorithm={algorithm}"
         sol_vec = getattr(self, algorithm)(lb, ub, tol)
-        status, solution = self.get_results(sol_vec, best=False)
+        status, solution = self.get_results(sol_vec, best=self._batch)
         if status == Status.SOLVED:
-            self._solutions = solution
+            if self._batch:
+                self._solutions.append(solution)
+            else:
+                self._solutions = solution
 
-    def multi_objective(self, algorithm, lb, ub, tol, lca_id=1): # Adapt to series
-        self._solutions = []
-        self._solutions_multiobjective = []
-        if lca_id <= 0:
-            logging.error(f"Multi-objective must have valid LCA ID. Check the input spreadsheet. LCA ID = {lca_id}")
-        self._model: Model = self._model
-        forage = ['G', 'L']
-        for v in forage:
-            self.__clear_searcher()
-            self._model.set_obj_weights(1.0, 0.0)
-            self._model.set_forage(v)
-            self._prefix_id = f"multi objective lb={lb}, ub={ub}, algorithm={algorithm}, max f1"
-            self._prefix_id += f", forage = {v}"
+    def clear_searcher(self):
+        self.__clear_searcher()
 
-            sol_vec = getattr(self, algorithm)(lb, ub, tol, uncertain_bounds=True)  # max f1
-            status, solution = self.get_results(sol_vec, best=True)  # get f1_ub, f2_lb
-            if solution is None:
-                logging.error(f"Model is infeasible for forage concentration {v} 20%")
-                continue
-            f1_ub, f2_ub = self._model.get_obj_sol(solution)  # get f1_ub, f2_lb
-
-            self._model.set_obj_weights(0.0, 1.0)
-            self.__clear_searcher()
-            self._prefix_id = f"multi objective lb={lb}, ub={ub}, algorithm={algorithm}, max f2"
-            self._prefix_id += f", forage = {v}"
-
-            sol_vec = getattr(self, algorithm)(lb, ub, tol, uncertain_bounds=True)  # max f2
-            status, solution = self.get_results(sol_vec, best=True)  # get f1_lb, f2_ub
-            f1_lb, f2_lb = self._model.get_obj_sol(solution)  # get f1_l, f2_ub
-
-            n_vals = int(np.ceil((1 + f2_ub - f2_lb) / tol))
-            n_vals = 50  # TODO remove
-            lca_rhs_space = np.linspace(f2_lb + 0.0001, f2_ub, n_vals)  # range[f2_lb, f2_ub]
-            self._model.set_obj_weights(1.0, 0.0)
-            for rhs in lca_rhs_space:
-                self._model.set_LCA_rhs(rhs)
-                self.__clear_searcher()
-                self._prefix_id = f"multi objective lb={lb}, ub={ub}, algorithm={algorithm}, rhs={rhs}"
-                self._prefix_id += f", forage = {v}"
-                sol_vec = getattr(self, algorithm)(lb, ub, tol, uncertain_bounds=True)
-                status, solution = self.get_results(sol_vec, best=True)
-                # self._model.write_lp_inside(rhs)
-                if status == Status.SOLVED:
-                    self._solutions_multiobjective.append(solution)
-                else:
-                    raise Exception("Multi-objective failure: Something wrong is going on. numerical_methods.py l182")
-            self._solutions += self._solutions_multiobjective
+    def set_batch_params(self, period):
+        self._model.set_batch_params(period)
 
     def get_results(self, solution_vec = None, best=False):
         """
@@ -234,7 +191,7 @@ class Searcher:
                             " Value must be 1 or -1, value parsed: {0}".format(direction)
             raise IOError(error_message)
         if results is None:
-            logging.info("Result vector is None..{0}, {1}".format(self._status, self._prefix_id))
+            logging.info("Result vector is None..{0}, {1}".format(self._status, self._msg))
             return None
         if len(results) <= 0:
             return None
@@ -243,10 +200,11 @@ class Searcher:
         best_id = [i for i, j in enumerate(obj_vals) if j == max(obj_vals)]
         return results[best_id[0]]
 
-    def __clear_searcher(self):
-        self._solutions.clear()
+    def __clear_searcher(self, force_clear=False):
+        if force_clear or (not self._batch):
+            self._solutions.clear()
         self._status = Status.READY
-        self._model.prefix_id = self._prefix_id
+        self._model.prefix_id = self._msg
 
 
 Algorithms = {'BF': 'brute_force_search', 'GSS': 'golden_section_search'}

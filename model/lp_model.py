@@ -24,8 +24,8 @@ class Model:
     data_scenario: pandas.DataFrame = None  # Scenario
     headers_scenario: data_handler.Data.ScenarioParameters = None  # Scenario
 
-    p_id, p_feed_scenario, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
-    p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_obj = [None for i in range(18)]
+    p_id, p_feed_scenario, p_batch, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
+    p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_obj = [None for i in range(19)]
 
     _diet = None
     _p_mpm = None
@@ -126,11 +126,13 @@ class Model:
         self.data_feed_scenario = self.ds.data_feed_scenario
         self.headers_feed_scenario = self.ds.headers_feed_scenario
 
-
-
-        [self.p_id, self.p_feed_scenario, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph,
+        [self.p_id, self.p_feed_scenario, self.p_batch, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph,
          self.p_selling_price, self.p_linearization_factor,
          self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters.values()
+
+        if self.p_batch > 0:
+            # TODO get batch csv data
+            return
 
         headers_feed_scenario = self.ds.headers_feed_scenario
         self.data_feed_scenario = self.ds.filter_column(self.ds.data_feed_scenario,
@@ -319,3 +321,6 @@ class Model:
         seq_of_pairs = tuple(zip(new_rhs.keys(), new_rhs.values()))
         self._diet.set_constraint_rhs(seq_of_pairs)
         self._diet.set_objective_function(list(zip(self._var_names_x, self.cost_obj_vector)))
+
+    def set_batch_params(self, period):
+        pass # TODO

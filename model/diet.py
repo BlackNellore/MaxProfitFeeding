@@ -12,22 +12,27 @@ class Diet:
 
     data_scenario: pandas.DataFrame = None  # Scenario
     headers_scenario: data_handler.Data.ScenarioParameters = None  # Scenario
+    data_batch: pandas.DataFrame = None  # Scenario
+    headers_batch: data_handler.Data.BatchParameters = None  # Scenario
 
     @staticmethod
     def initialize(msg):
-        global ds, data_scenario, headers_scenario
+        global ds, data_scenario, headers_scenario, data_batch, headers_batch
         ds = data_handler.Data(**INPUT)
         data_scenario = ds.data_scenario
         headers_scenario = ds.headers_scenario
+        data_batch = ds.data_batch
+        headers_batch = ds.headers_batch
         logging.info(msg)
 
-    @staticmethod
-    def run():
+    def run(self):
         logging.info("Iterating through scenarios")
         results = {}
         for scenario in data_scenario.values:
             parameters = dict(zip(headers_scenario, scenario))
-            multiobjective = False # adapt to series
+            batch = False
+            if parameters[headers_scenario.s_batch] > 0:
+                batch = True
 
             logging.info("Current Scenario:")
             logging.info("{}".format(parameters))
@@ -35,21 +40,7 @@ class Diet:
             logging.info("Initializing model")
             model = model_factory(ds, parameters)
             logging.info("Initializing numerical methods")
-            optimizer = Searcher(model)
-
-            tol = parameters[headers_scenario.s_tol]
-            logging.info("Refining bounds")
-            lb, ub = optimizer.refine_bounds(parameters[headers_scenario.s_lb],
-                                             parameters[headers_scenario.s_ub],
-                                             tol
-                                             )
-
-            if lb is None or ub is None:
-                logging.warning("There is no feasible solution in the domain {0} <= CNEm <= {1}"
-                                .format(parameters[headers_scenario.s_lb], parameters[headers_scenario.s_ub]))
-                continue
-            logging.info("Refinement completed")
-            logging.info("Choosing optimization method")
+            optimizer = Searcher(model, batch)
 
             # TODO Implement Sensitivity Analisis: sensitivity.py
 
@@ -61,13 +52,17 @@ class Diet:
                 logging.error("Algorithm {} not found, scenario skipped".format(
                     parameters[headers_scenario.s_algorithm]))
                 continue
-            algorithm = Algorithms[parameters[headers_scenario.s_algorithm]]
-            if not multiobjective:
+
+            tol = parameters[headers_scenario.s_tol]
+            if not batch:
+                lb, ub = self.refine_bounds(optimizer, parameters)
+                if lb is None:
+                    continue
                 logging.info(f'Optimizing with {msg}')
-                optimizer.single_objective(algorithm, lb, ub, tol)
+                self.__single_scenario(optimizer, parameters, lb, ub, tol)
             else:
                 logging.info(f"Optimizing with multiobjective epsilon-constrained based on {msg}")
-                optimizer.multi_objective(algorithm, lb, ub, tol)
+                self.__multi_scenario(optimizer, parameters, lb, ub, tol)
 
             logging.info("Saving solution locally")
             status, solution = optimizer.get_results()
@@ -80,6 +75,39 @@ class Diet:
         ds.store_output(results, OUTPUT)
 
         logging.info("END")
+
+    @staticmethod
+    def refine_bounds(optimizer, parameters):
+        logging.info("Refining bounds")
+        lb, ub = optimizer.refine_bounds(parameters[headers_scenario.s_lb],
+                                         parameters[headers_scenario.s_ub],
+                                         parameters[headers_scenario.s_tol]
+                                         )
+
+        if lb is None or ub is None:
+            logging.warning("There is no feasible solution in the domain {0} <= CNEm <= {1}"
+                            .format(parameters[headers_scenario.s_lb], parameters[headers_scenario.s_ub]))
+            return None, None
+        logging.info("Refinement completed")
+        logging.info("Choosing optimization method")
+        return lb, ub
+
+    @staticmethod
+    def __single_scenario(optimizer, parameters, lb, ub, tol):
+        algorithm = Algorithms[parameters[headers_scenario.s_algorithm]]
+        optimizer.run_scenario(algorithm, lb, ub, tol)
+
+    def __multi_scenario(self, optimizer, parameters, lb, ub, tol):
+        algorithm = Algorithms[parameters[headers_scenario.s_algorithm]]
+        batch_id = parameters[headers_scenario.s_batch]
+        batch_parameters = ds.filter_column(data_batch, headers_batch.s_batch_id, batch_id)
+        # batch_data = ds.get_batch_scenario(batch_id)
+        batch_space = range(list(batch_parameters[headers_batch.s_initial_period])[0],
+                            list(batch_parameters[headers_batch.s_final_period])[0],
+                            1)
+        for period in batch_space:
+            optimizer.set_batch_params(period)
+            self.__single_scenario(optimizer, parameters, lb, ub, tol)
 
 
 def config(input_info, output_info):

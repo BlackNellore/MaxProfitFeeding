@@ -179,7 +179,7 @@ class Data:
                                                 self.headers_feed_lib.s_ID,
                                                 unwrap_list(filter_ingredients_ids))
 
-        # TODO Check if all ingridients exist in the library.
+        # TODO Check if all ingredients exist in the library.
 
         # Sheet Scenario
         self.data_scenario = pandas.read_excel(excel_file, sheet_scenario['name'])
@@ -188,8 +188,6 @@ class Data:
         # Sheet batch
         self.data_batch = pandas.read_excel(excel_file, sheet_batch['name'])
         self.headers_batch = self.BatchParameters(*(list(self.data_batch)))
-
-        # TODO read Historical Series
 
         # checking if config.py is consistent with Excel headers
         check_list = [(sheet_feed_lib, self.headers_feed_lib),
@@ -210,6 +208,11 @@ class Data:
 
         # Saving info in the log
         logging.info("\n\nAll data read")
+
+    def get_batch_scenario(self, batch_id):
+        # TODO put stuff here reading file and returnig stuff
+
+        return pandas.DataFrame()
 
     def datasets(self):
         """
