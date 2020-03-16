@@ -39,7 +39,6 @@ def unwrap_list(nested_list):
 class Data:
     pandas.DataFrame.mask = mask
 
-
     # Sheet Cattle
     class ScenarioParameters(NamedTuple):
         s_id: str
@@ -150,6 +149,8 @@ class Data:
     data_scenario: pandas.DataFrame = None  # Scenario
     data_batch: pandas.DataFrame = None  # Batch
 
+    data_series = {}  # batch dictionary
+
     def __init__(self,
                  filename,
                  sheet_feed_lib,
@@ -189,11 +190,84 @@ class Data:
         self.data_batch = pandas.read_excel(excel_file, sheet_batch['name'])
         self.headers_batch = self.BatchParameters(*(list(self.data_batch)))
 
+        # csv files
+        csv_file_names = self.data_batch.filter(items=[self.headers_batch.s_file_name]).values
+        for name in csv_file_names:
+            self.data_series[name[0]] = pandas.read_csv(name[0], index_col=0)
+
+        # filter batch executions from data_scenario
+        batch_id = self.data_batch.filter(items=[self.headers_batch.s_batch_id]).values
+        batch_scenarios = self.filter_column(self.data_scenario,
+                                             self.headers_scenario.s_batch,
+                                             unwrap_list(batch_id))
+        # remove from data_scenario all batch rows
+        self.data_scenario = self.data_scenario.drop(batch_scenarios.index.values, axis=0)
+
+        # filter batch executions from data_feed_scenario
+        feed_scenarios_id = list(batch_scenarios['Feed Scenario'])
+        batch_feed_scenarios = self.filter_column(self.data_feed_scenario,
+                                                  self.headers_feed_scenario.s_feed_scenario,
+                                                  feed_scenarios_id)
+        # remove from data_feed_scenario all batch rows
+        self.data_feed_scenario = self.data_feed_scenario.drop(batch_feed_scenarios.index.values, axis=0)
+
+        feed_scenarios_ids = list(batch_feed_scenarios['Feed Scenario'])
+
+        # TODO: Declare these two lists as a class attrib.
+        batchScenarioCandidate = [self.headers_scenario.s_sbw, self.headers_scenario.s_bcs,
+                                  self.headers_scenario.s_be, self.headers_scenario.s_l,
+                                  self.headers_scenario.s_sex, self.headers_scenario.s_a2,
+                                  self.headers_scenario.s_ph, self.headers_scenario.s_price]
+
+        batchFeedScenarioCandidate = [self.headers_feed_scenario.s_min, self.headers_feed_scenario.s_max,
+                                      self.headers_feed_scenario.s_feed_cost]
+
+        batchInfo = [self.map_values(self.data_batch['Batch ID'], self.data_batch['Filename']),
+                     self.map_values(self.data_batch['Batch ID'], self.data_batch['Initial Period']),
+                     self.map_values(self.data_batch['Batch ID'], self.data_batch['Final Period'])]
+
+        batch_id = unwrap_list(batch_id)
+
+        candidatesScenario = self.get_column_data(batch_scenarios, batchScenarioCandidate)
+        candidateFeedScenario = self.get_column_data(batch_feed_scenarios, batchFeedScenarioCandidate)
+        feedScenarioBatchId = self.map_values(batch_scenarios['Feed Scenario'], batch_scenarios['Batch'])
+
+        # replace batch name by temporal series in Scenario Data
+        for i in range(len(batch_id)):
+            for j in range(len(candidatesScenario[0])):
+                if type(candidatesScenario[i][j]) == str:
+                    batch_name = batchInfo[0][batch_id[i]]
+                    initial = batchInfo[1][batch_id[i]]
+                    final = batchInfo[2][batch_id[i]]
+                    candidatesScenario[i][j] = list(self.get_series_from_batch(self.data_series[batch_name],
+                                                                               candidatesScenario[i][j],
+                                                                               [initial, final]))
+
+        # replace batch name by temporal series in Feed Scenario Data
+        for i in range(len(feed_scenarios_ids)):
+            for j in range(len(candidateFeedScenario[0])):
+                if type(candidateFeedScenario[i][j]) == str:
+                    batch_name = batchInfo[0][feedScenarioBatchId[feed_scenarios_ids[i]]]
+                    initial = batchInfo[1][feedScenarioBatchId[feed_scenarios_ids[i]]]
+                    final = batchInfo[2][feedScenarioBatchId[feed_scenarios_ids[i]]]
+                    candidateFeedScenario[i][j] = list(self.get_series_from_batch(self.data_series[batch_name],
+                                                                                  candidateFeedScenario[i][j],
+                                                                                  [initial, final]))
+
+        # update batch_scenarios and feed_scenarios with temporal series
+        batch_scenarios.loc[:, batchScenarioCandidate] = candidatesScenario
+        batch_feed_scenarios.loc[:, batchFeedScenarioCandidate] = candidateFeedScenario
+
+        # update data frame with batchs
+        self.data_scenario = self.data_scenario.append(batch_scenarios).sort_index()
+        self.data_feed_scenario = self.data_feed_scenario.append(batch_feed_scenarios).sort_index()
+
         # checking if config.py is consistent with Excel headers
         check_list = [(sheet_feed_lib, self.headers_feed_lib),
                       (sheet_feeds, self.headers_feed_scenario),
                       (sheet_scenario, self.headers_scenario),
                       (sheet_batch, self.headers_batch)]
+
         try:
             for sheet in check_list:
                 if sheet[0]['headers'] != [x for x in sheet[1]]:
@@ -204,7 +278,6 @@ class Data:
              self.headers_feed_scenario,
              self.headers_scenario] = [None for i in range(3)]
             raise IOError(e)
-
 
         # Saving info in the log
         logging.info("\n\nAll data read")
@@ -233,6 +306,12 @@ class Data:
                 self.headers_scenario]
 
     @staticmethod
+    def get_series_from_batch(batch, col_name, period):
+        # TODO: filtrar pela coluna 'id col'
+        # TODO: do all possible checks (e.g. period[1] > period[0] etc)
+        return batch[col_name].loc[period[0]:period[1]]
+
+    @staticmethod
     def filter_column(data_frame, col_name, val):
         """ Filter elements in data_frame where col_name == val or in [val]"""
         return data_frame.mask(col_name, val)
@@ -247,7 +326,7 @@ class Data:
             else:
                 resulting_list = [func(i) for i in unwrap_list(ds)]
             if "%" in col_name:
-                resulting_list = [i*0.01 for i in unwrap_list(ds)]
+                resulting_list = [i * 0.01 for i in unwrap_list(ds)]
             if len(resulting_list) == 1:
                 return resulting_list[0]
             else:
