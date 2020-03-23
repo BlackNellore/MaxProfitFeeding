@@ -151,6 +151,14 @@ class Data:
 
     data_series = {}  # batch dictionary
 
+    # TODO: preencher o batch_map nessa estrutura:
+    # batch_map = {Scenario_ID:
+    #                  {"data_scenario": {Feed_Scenario: {Feed_id: {col_name: [list_from_batch_file]}}},
+    #                   "data_feed_scenario": {ID: {col_name: [list_from_batch_file]}}
+    #                   }
+    #              }
+    batch_map = None
+
     def __init__(self,
                  filename,
                  sheet_feed_lib,
