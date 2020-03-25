@@ -163,8 +163,8 @@ class Searcher:
             else:
                 self._solutions = solution
 
-    def clear_searcher(self):
-        self.__clear_searcher()
+    def clear_searcher(self, force=False):
+        self.__clear_searcher(force_clear=force)
 
     def set_batch_params(self, period):
         self._model.set_batch_params(period)

@@ -42,7 +42,7 @@ class Diet:
             logging.info("Initializing numerical methods")
             optimizer = Searcher(model, batch)
 
-            # TODO Implement Sensitivity Analisis: sensitivity.py
+            # TODO Implement Sensitivity Analysis: sensitivity.py
 
             if parameters[headers_scenario.s_algorithm] == "GSS":
                 msg = "Golden-Section Search algorithm"
@@ -98,15 +98,18 @@ class Diet:
         optimizer.run_scenario(algorithm, lb, ub, tol)
 
     def __multi_scenario(self, optimizer, parameters, lb, ub, tol):
+        optimizer.clear_searcher(force=True)
         algorithm = Algorithms[parameters[headers_scenario.s_algorithm]]
         batch_id = parameters[headers_scenario.s_batch]
         batch_parameters = ds.filter_column(data_batch, headers_batch.s_batch_id, batch_id)
-        # batch_data = ds.get_batch_scenario(batch_id)
-        batch_space = range(list(batch_parameters[headers_batch.s_initial_period])[0],
-                            list(batch_parameters[headers_batch.s_final_period])[0],
-                            1)
-        for period in batch_space:
-            optimizer.set_batch_params(period)
+
+        # batch_space = range(list(batch_parameters[headers_batch.s_initial_period])[0],
+        #                     list(batch_parameters[headers_batch.s_final_period])[0],
+        #                     1)
+        batch_space = range(list(batch_parameters[headers_batch.s_final_period])[0] -
+                            list(batch_parameters[headers_batch.s_initial_period])[0] + 1)
+        for i in batch_space:
+            optimizer.set_batch_params(i)
             self.__single_scenario(optimizer, parameters, lb, ub, tol)
 
 

@@ -4,7 +4,6 @@ import pandas
 from model import data_handler
 from model.nrc_equations import NRC_eq as nrc
 import logging
-from model.data_handler import Data
 
 cnem_lb, cnem_ub = 0.8, 3
 
@@ -27,6 +26,12 @@ class Model:
     p_id, p_feed_scenario, p_batch, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
     p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_obj = [None for i in range(19)]
 
+    _batch_map: dict = None
+    # batch_map = {batch_ID:
+    #                  {"data_feed_scenario": {Feed_Scenario: {Feed_id: {col_name: [list_from_batch_file]}}},
+    #                   "data_scenario": {ID: {col_name: [list_from_batch_file]}}
+    #                   }
+    #              }
     _diet = None
     _p_mpm = None
     _p_dmi = None
@@ -51,7 +56,9 @@ class Model:
         try:
             self.opt_sol = None
             self._p_cnem = p_cnem
-            self._compute_parameters()
+            if self.p_batch > 0:
+                self._setup_batch()
+            self._compute_parameters(p_id)
             if self._diet is None:
                 self._build_model()
             else:
@@ -118,6 +125,20 @@ class Model:
     constraints_names = None
     revenue_obj_vector = None
     expenditure_obj_vector = None
+    dm_af_coversion = None
+    batch_execution_id = None
+
+    scenario_parameters = None
+
+    def __set_parameters(self, parameters):
+        if isinstance(parameters, dict):
+            [self.p_id, self.p_feed_scenario, self.p_batch, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l,
+             self.p_sex, self.p_a2, self.p_ph, self.p_selling_price, self.p_linearization_factor,
+             self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters.values()
+        elif isinstance(parameters, list):
+            [self.p_id, self.p_feed_scenario, self.p_batch, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l,
+             self.p_sex, self.p_a2, self.p_ph, self.p_selling_price, self.p_linearization_factor,
+             self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters
 
     def _cast_data(self, out_ds, parameters):
         """Retrieve parameters data from table. See data_handler.py for more"""
@@ -126,13 +147,8 @@ class Model:
         self.data_feed_scenario = self.ds.data_feed_scenario
         self.headers_feed_scenario = self.ds.headers_feed_scenario
 
-        [self.p_id, self.p_feed_scenario, self.p_batch, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph,
-         self.p_selling_price, self.p_linearization_factor,
-         self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters.values()
-
-        if self.p_batch > 0:
-            # TODO get batch csv data
-            return
+        self.scenario_parameters = parameters
+        self.__set_parameters(parameters)
 
         headers_feed_scenario = self.ds.headers_feed_scenario
         self.data_feed_scenario = self.ds.filter_column(self.ds.data_feed_scenario,
@@ -155,22 +171,45 @@ class Model:
         self.cost_vector = self.ds.sorted_column(self.data_feed_scenario, headers_feed_scenario.s_feed_cost,
                                                  self.ingredient_ids,
                                                  self.headers_feed_scenario.s_ID)
-        dm_af_coversion = self.ds.sorted_column(self.data_feed_lib, self.headers_feed_lib.s_DM,
-                                                self.ingredient_ids,
-                                                self.headers_feed_lib.s_ID)
-        for i in range(len(self.cost_vector)):
-            self.cost_vector[i] /= dm_af_coversion[i]
+        self.dm_af_coversion = self.ds.sorted_column(self.data_feed_lib, self.headers_feed_lib.s_DM,
+                                                     self.ingredient_ids,
+                                                     self.headers_feed_lib.s_ID)
+
         self.neg_vector = self.ds.sorted_column(self.data_feed_lib, self.headers_feed_lib.s_NEga,
                                                 self.ingredient_ids,
                                                 self.headers_feed_lib.s_ID)
 
-    def _compute_parameters(self):
+        if self.p_batch > 0:
+            try:
+                batch_feed_scenario = self.ds.batch_map[self.p_batch]["data_feed_scenario"][self.p_feed_scenario]
+                # {Feed_id: {col_name: [list_from_batch_file]}}
+            except KeyError:
+                logging.warning(f"No Feed_scenario batch for scenario {self.p_id},"
+                                f" batch {self.p_batch}, feed_scenario{self.p_feed_scenario}")
+                batch_feed_scenario = {}
+            try:
+                batch_scenario = self.ds.batch_map[self.p_batch]["data_scenario"][self.p_id]
+                # {col_name: [list_from_batch_file]}}
+            except KeyError:
+                logging.warning(f"No Feed_scenario batch for scenario {self.p_id},"
+                                f" batch {self.p_batch}, feed_scenario{self.p_feed_scenario}")
+                batch_scenario = {}
+
+            self._batch_map = {"data_feed_scenario": batch_feed_scenario,
+                               "data_scenario": batch_scenario}
+
+    def _compute_parameters(self, problem_id):
+
         """Compute parameters variable with CNEm"""
         self._p_mpm, self._p_dmi, self._p_nem, self._p_pe_ndf = \
             nrc.get_all_parameters(self._p_cnem, self.p_sbw, self.p_bcs,
                                    self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph)
 
         self.cost_obj_vector = self.cost_vector.copy()
+
+        for i in range(len(self.cost_obj_vector)):
+            self.cost_obj_vector[i] /= self.dm_af_coversion[i]
+
         self.revenue_obj_vector = self.cost_vector.copy()
         self.expenditure_obj_vector = self.cost_vector.copy()
         swg = []
@@ -322,5 +361,30 @@ class Model:
         self._diet.set_constraint_rhs(seq_of_pairs)
         self._diet.set_objective_function(list(zip(self._var_names_x, self.cost_obj_vector)))
 
-    def set_batch_params(self, period):
-        pass # TODO
+    def set_batch_params(self, i):
+        self.batch_execution_id = i
+
+    def _setup_batch(self):
+        # batch_map = {"data_feed_scenario": {Feed_id: {col_name: [list_from_batch_file]}}},
+        #              "data_scenario": {col_name: [list_from_batch_file]}}
+        #              }
+
+        for col_name, vector in self._batch_map["data_scenario"].items():
+            self.scenario_parameters[col_name] = vector[self.batch_execution_id]
+        self.__set_parameters(self.scenario_parameters)
+
+        for ing_id, data in self._batch_map["data_feed_scenario"].items():
+            for col_name, vector in data.items():
+                if col_name == self.headers_feed_scenario.s_feed_cost:
+                    self.cost_vector[self.ingredient_ids.index(ing_id)] = vector[self.batch_execution_id]
+                elif col_name == self.headers_feed_scenario.s_min:
+                    self.data_feed_scenario.loc[
+                        self.data_feed_scenario[self.headers_feed_scenario.s_ID] == ing_id,
+                        self.headers_feed_scenario.s_min
+                    ] = vector[self.batch_execution_id]
+                elif col_name == self.headers_feed_scenario.s_max:
+                    self.data_feed_scenario.loc[
+                        self.data_feed_scenario[self.headers_feed_scenario.s_ID] == ing_id,
+                        self.headers_feed_scenario.s_max
+                    ] = vector[self.batch_execution_id]
+
