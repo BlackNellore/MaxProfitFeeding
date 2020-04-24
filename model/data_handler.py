@@ -202,15 +202,16 @@ class Data:
         self.headers_batch = self.BatchParameters(*(list(self.data_batch)))
 
         # csv files
-        csv_file_names = self.data_batch.filter(items=[self.headers_batch.s_file_name]).values
-        for name in csv_file_names:
-            self.data_series[name[0]] = pandas.read_csv(name[0], index_col=0)
+        csv_file_names = dict(zip(unwrap_list(self.data_batch.filter(items=[self.headers_batch.s_batch_id]).values),
+                                  unwrap_list(self.data_batch.filter(items=[self.headers_batch.s_file_name]).values)))
+        for name in csv_file_names.values():
+            self.data_series[name] = pandas.read_csv(name, index_col=0)
 
         # filter batch executions from data_scenario
-        batch_id = self.data_batch.filter(items=[self.headers_batch.s_batch_id]).values
+        batch_ids = unwrap_list(self.data_batch.filter(items=[self.headers_batch.s_batch_id]).values)
         batch_scenarios = self.filter_column(self.data_scenario,
                                              self.headers_scenario.s_batch,
-                                             unwrap_list(batch_id))
+                                             batch_ids)
         # # remove from data_scenario all batch rows
         # self.data_scenario = self.data_scenario.drop(batch_scenarios.index.values, axis=0)
 
@@ -238,8 +239,8 @@ class Data:
 
         # batch_id = unwrap_list(batch_id)
 
-        candidatesScenario = self.get_column_data(batch_scenarios, self.batchScenarioCandidate)
-        candidateFeedScenario = self.get_column_data(batch_feed_scenarios, self.batchFeedScenarioCandidate)
+        # candidatesScenario = self.get_column_data(batch_scenarios, self.batchScenarioCandidate)
+        # candidateFeedScenario = self.get_column_data(batch_feed_scenarios, self.batchFeedScenarioCandidate)
         # feedScenarioBatchId = self.map_values(batch_scenarios['Feed Scenario'], batch_scenarios['Batch'])
 
         # batch_map = {batch_ID:
@@ -247,22 +248,34 @@ class Data:
         #                   "data_scenario": {ID: {col_name: [list_from_batch_file]}}
         #                   }
         #              }
-        self.batch_map = {}
-        for i, id in enumerate(list(self.data_batch[self.headers_batch.s_batch_id])):
+        self.batch_map = dict(zip(list(batch_scenarios[self.headers_scenario.s_id]),
+                                  [None for i in range(batch_scenarios.shape[0])]))
+        for id in self.batch_map.keys():
             self.batch_map[id] = {"data_feed_scenario": {}, "data_scenario": {}}
             batch_data_feed_scenario = {}
+            row = self.filter_column(batch_scenarios,
+                                     self.headers_scenario.s_id,
+                                     id)
+            feed_scn = list(row[self.headers_scenario.s_feed_scenario])[0]
+            batch_id = list(row[self.headers_scenario.s_batch])[0]
+            subset_feed = self.filter_column(batch_feed_scenarios,
+                                        self.headers_feed_scenario.s_feed_scenario,
+                                        feed_scn)
             for h_feed_scn in self.batchFeedScenarioCandidate:
-                for j, val in enumerate(list(batch_feed_scenarios[h_feed_scn])):
+                for j, val in enumerate(list(subset_feed[h_feed_scn])):
                     if type(val) is str:
-                        feed_scn = list(batch_feed_scenarios[self.headers_feed_scenario.s_feed_scenario])[j]
                         if not feed_scn in batch_data_feed_scenario:
                             batch_data_feed_scenario[feed_scn] = {}
-                        feed_id = list(batch_feed_scenarios[self.headers_feed_scenario.s_ID])[j]
+                        feed_id = list(subset_feed[self.headers_feed_scenario.s_ID])[j]
                         if not feed_id in batch_data_feed_scenario[feed_scn]:
                             batch_data_feed_scenario[feed_scn][feed_id] = {}
-                        batch_name = list(self.data_batch[self.headers_batch.s_file_name])[i]
-                        initial = list(self.data_batch[self.headers_batch.s_initial_period])[i]
-                        final = list(self.data_batch[self.headers_batch.s_final_period])[i]
+                        batch_name = csv_file_names[batch_id]
+                        initial = list(self.filter_column(self.data_batch,
+                                                     self.headers_batch.s_batch_id,
+                                                     batch_id)[self.headers_batch.s_initial_period])[0]
+                        final = list(self.filter_column(self.data_batch,
+                                                     self.headers_batch.s_batch_id,
+                                                     batch_id)[self.headers_batch.s_final_period])[0]
                         batch_data_feed_scenario[feed_scn][feed_id][h_feed_scn] = \
                             list(self.get_series_from_batch(self.data_series[batch_name],
                                                             val,
@@ -271,15 +284,18 @@ class Data:
 
             batch_data_scenario = {}
             for h_scn in self.batchScenarioCandidate:
-                for j, val in enumerate(list(batch_scenarios[h_scn])):
+                for j, val in enumerate(list(row[h_scn])):
                     if type(val) is str:
-                        scn_id = list(batch_scenarios[self.headers_scenario.s_id])[j]
-                        if not scn_id in batch_data_scenario:
-                            batch_data_scenario[scn_id] = {}
-                        batch_name = list(self.data_batch[self.headers_batch.s_file_name])[i]
-                        initial = list(self.data_batch[self.headers_batch.s_initial_period])[i]
-                        final = list(self.data_batch[self.headers_batch.s_final_period])[i]
-                        batch_data_scenario[scn_id][h_scn] = \
+                        if not id in batch_data_scenario:
+                            batch_data_scenario[id] = {}
+                        batch_name = csv_file_names[batch_id]
+                        initial = list(self.filter_column(self.data_batch,
+                                                          self.headers_batch.s_batch_id,
+                                                          batch_id)[self.headers_batch.s_initial_period])[0]
+                        final = list(self.filter_column(self.data_batch,
+                                                        self.headers_batch.s_batch_id,
+                                                        batch_id)[self.headers_batch.s_final_period])[0]
+                        batch_data_scenario[id][h_scn] = \
                             list(self.get_series_from_batch(self.data_series[batch_name],
                                                             val,
                                                             [initial, final]))

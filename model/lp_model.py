@@ -181,14 +181,14 @@ class Model:
 
         if self.p_batch > 0:
             try:
-                batch_feed_scenario = self.ds.batch_map[self.p_batch]["data_feed_scenario"][self.p_feed_scenario]
+                batch_feed_scenario = self.ds.batch_map[self.p_id]["data_feed_scenario"][self.p_feed_scenario]
                 # {Feed_id: {col_name: [list_from_batch_file]}}
             except KeyError:
                 logging.warning(f"No Feed_scenario batch for scenario {self.p_id},"
                                 f" batch {self.p_batch}, feed_scenario{self.p_feed_scenario}")
                 batch_feed_scenario = {}
             try:
-                batch_scenario = self.ds.batch_map[self.p_batch]["data_scenario"][self.p_id]
+                batch_scenario = self.ds.batch_map[self.p_id]["data_scenario"][self.p_id]
                 # {col_name: [list_from_batch_file]}}
             except KeyError:
                 logging.warning(f"No Feed_scenario batch for scenario {self.p_id},"
