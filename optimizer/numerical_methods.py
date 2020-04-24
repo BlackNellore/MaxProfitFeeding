@@ -87,7 +87,7 @@ class Searcher:
             logging.error("An error occurred in numerical_method.Searcher.__brute_force method: {}".format(e))
             return None
 
-    def golden_section_search(self, lb, ub, p_tol, uncertain_bounds=False):
+    def golden_section_search(self, lb, ub, p_tol, uncertain_bounds=True):
         """Executes golden-section search algorithm"""
         if self._status != Status.READY:
             self.__clear_searcher()
