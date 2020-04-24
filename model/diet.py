@@ -54,6 +54,8 @@ class Diet:
                 continue
 
             tol = parameters[headers_scenario.s_tol]
+            lb = parameters[headers_scenario.s_lb]
+            ub = parameters[headers_scenario.s_ub]
             if not batch:
                 lb, ub = self.refine_bounds(optimizer, parameters)
                 if lb is None:
