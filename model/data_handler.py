@@ -179,10 +179,12 @@ class Data:
         # Feed Library Sheet
         data_feed_lib = pandas.read_excel(excel_file, sheet_feed_lib['name'])
         self.headers_feed_lib = self.IngredientProperties(*(list(data_feed_lib)))
+        data_feed_lib.astype({self.headers_feed_lib.s_ID: 'int64'}).dtypes
 
         # Feeds scenarios
         self.data_feed_scenario = pandas.read_excel(excel_file, sheet_feeds['name'])
         self.headers_feed_scenario = self.ScenarioFeedProperties(*(list(self.data_feed_scenario)))
+        self.data_feed_scenario.astype({self.headers_feed_scenario.s_ID: 'int64'}).dtypes
 
         # Filters feed library with the feeds on the scenario
         filter_ingredients_ids = \
@@ -197,10 +199,12 @@ class Data:
         # Sheet Scenario
         self.data_scenario = pandas.read_excel(excel_file, sheet_scenario['name'])
         self.headers_scenario = self.ScenarioParameters(*(list(self.data_scenario)))
+        self.data_scenario.astype({self.headers_scenario.s_id: 'int64'}).dtypes
 
         # Sheet batch
         self.data_batch = pandas.read_excel(excel_file, sheet_batch['name'])
         self.headers_batch = self.BatchParameters(*(list(self.data_batch)))
+        self.data_batch.astype({self.headers_batch.s_batch_id: 'int64'}).dtypes
 
         # csv files
         csv_file_names = dict(zip(unwrap_list(self.data_batch.filter(items=[self.headers_batch.s_batch_id]).values),
