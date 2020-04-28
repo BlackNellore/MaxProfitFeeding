@@ -397,7 +397,7 @@ class Data:
             else:
                 return resulting_list
         else:
-            ds = data_frame.filter(items=col_name).get_values()
+            ds = data_frame.filter(items=col_name).to_numpy()
             if ds.shape[0] > 1:
                 return [list(row) for row in list(ds)]
             else:
@@ -411,7 +411,7 @@ class Data:
     @staticmethod
     def match_by_column(data_frame1, data_frame2, col_name):
         """Return intersection of df1 with df2 filtered by column elements"""
-        elements = data_frame2.filter(items=[col_name]).get_values()
+        elements = data_frame2.filter(items=[col_name]).to_numpy()
         ds = data_frame1.mask(col_name, unwrap_list(elements))
         return ds
 
