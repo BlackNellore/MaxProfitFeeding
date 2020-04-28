@@ -189,7 +189,8 @@ class Data:
             self.data_feed_scenario.filter(items=[self.headers_feed_scenario.s_ID]).values
         self.data_feed_lib = self.filter_column(data_feed_lib,
                                                 self.headers_feed_lib.s_ID,
-                                                unwrap_list(filter_ingredients_ids))
+                                                unwrap_list(filter_ingredients_ids),
+                                                int64=True)
 
         # TODO Check if all ingredients exist in the library.
 
@@ -211,15 +212,17 @@ class Data:
         batch_ids = unwrap_list(self.data_batch.filter(items=[self.headers_batch.s_batch_id]).values)
         batch_scenarios = self.filter_column(self.data_scenario,
                                              self.headers_scenario.s_batch,
-                                             batch_ids)
+                                             batch_ids,
+                                             int64=True)
         # # remove from data_scenario all batch rows
         # self.data_scenario = self.data_scenario.drop(batch_scenarios.index.values, axis=0)
 
         # filter batch executions from data_feed_scenario
-        feed_scenarios_id = list(batch_scenarios['Feed Scenario'])
+        feed_scenarios_id = unwrap_list(batch_scenarios.filter(items=[self.headers_scenario.s_feed_scenario]).values)
         batch_feed_scenarios = self.filter_column(self.data_feed_scenario,
                                                   self.headers_feed_scenario.s_feed_scenario,
-                                                  feed_scenarios_id)
+                                                  feed_scenarios_id,
+                                                  int64=True)
         # remove from data_feed_scenario all batch rows
         # self.data_feed_scenario = self.data_feed_scenario.drop(batch_feed_scenarios.index.values, axis=0)
 
@@ -248,19 +251,24 @@ class Data:
         #                   "data_scenario": {ID: {col_name: [list_from_batch_file]}}
         #                   }
         #              }
-        self.batch_map = dict(zip(list(batch_scenarios[self.headers_scenario.s_id]),
+        list_batch_id = unwrap_list(batch_scenarios.filter(items=[self.headers_scenario.s_id]).values)
+
+        self.batch_map = dict(zip(list_batch_id,
                                   [None for i in range(batch_scenarios.shape[0])]))
+
         for id in self.batch_map.keys():
             self.batch_map[id] = {"data_feed_scenario": {}, "data_scenario": {}}
             batch_data_feed_scenario = {}
             row = self.filter_column(batch_scenarios,
                                      self.headers_scenario.s_id,
-                                     id)
+                                     id,
+                                     int64=True)
             feed_scn = list(row[self.headers_scenario.s_feed_scenario])[0]
             batch_id = list(row[self.headers_scenario.s_batch])[0]
             subset_feed = self.filter_column(batch_feed_scenarios,
-                                        self.headers_feed_scenario.s_feed_scenario,
-                                        feed_scn)
+                                             self.headers_feed_scenario.s_feed_scenario,
+                                             feed_scn,
+                                             int64=True)
             for h_feed_scn in self.batchFeedScenarioCandidate:
                 for j, val in enumerate(list(subset_feed[h_feed_scn])):
                     if type(val) is str:
@@ -271,11 +279,13 @@ class Data:
                             batch_data_feed_scenario[feed_scn][feed_id] = {}
                         batch_name = csv_file_names[batch_id]
                         initial = list(self.filter_column(self.data_batch,
-                                                     self.headers_batch.s_batch_id,
-                                                     batch_id)[self.headers_batch.s_initial_period])[0]
+                                                          self.headers_batch.s_batch_id,
+                                                          batch_id,
+                                                          int64=True)[self.headers_batch.s_initial_period])[0]
                         final = list(self.filter_column(self.data_batch,
-                                                     self.headers_batch.s_batch_id,
-                                                     batch_id)[self.headers_batch.s_final_period])[0]
+                                                        self.headers_batch.s_batch_id,
+                                                        batch_id,
+                                                        int64=True)[self.headers_batch.s_final_period])[0]
                         batch_data_feed_scenario[feed_scn][feed_id][h_feed_scn] = \
                             list(self.get_series_from_batch(self.data_series[batch_name],
                                                             val,
@@ -291,10 +301,12 @@ class Data:
                         batch_name = csv_file_names[batch_id]
                         initial = list(self.filter_column(self.data_batch,
                                                           self.headers_batch.s_batch_id,
-                                                          batch_id)[self.headers_batch.s_initial_period])[0]
+                                                          batch_id,
+                                                          int64=True)[self.headers_batch.s_initial_period])[0]
                         final = list(self.filter_column(self.data_batch,
                                                         self.headers_batch.s_batch_id,
-                                                        batch_id)[self.headers_batch.s_final_period])[0]
+                                                        batch_id,
+                                                        int64=True)[self.headers_batch.s_final_period])[0]
                         batch_data_scenario[id][h_scn] = \
                             list(self.get_series_from_batch(self.data_series[batch_name],
                                                             val,
@@ -377,9 +389,19 @@ class Data:
         return batch[col_name].loc[period[0]:period[1]]
 
     @staticmethod
-    def filter_column(data_frame, col_name, val):
+    def filter_column(data_frame, col_name, val, int64=False):
         """ Filter elements in data_frame where col_name == val or in [val]"""
-        return data_frame.mask(col_name, val)
+        if int64:
+            try:
+                if isinstance(val,list):
+                    val = list(map(int, val))
+                    return data_frame.mask(col_name, val)
+                else:
+                    return data_frame.mask(col_name, int(val))
+            except Exception as e:
+                return data_frame.mask(col_name, val)
+        else:
+            return data_frame.mask(col_name, val)
 
     @staticmethod
     def get_column_data(data_frame, col_name, func=None):
