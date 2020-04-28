@@ -153,13 +153,15 @@ class Model:
         headers_feed_scenario = self.ds.headers_feed_scenario
         self.data_feed_scenario = self.ds.filter_column(self.ds.data_feed_scenario,
                                                         self.ds.headers_feed_scenario.s_feed_scenario,
-                                                        self.p_feed_scenario)
+                                                        self.p_feed_scenario,
+                                                        int64=True)
         self.ingredient_ids = list(
             self.ds.get_column_data(self.data_feed_scenario, self.headers_feed_scenario.s_ID, int))
 
         self.headers_feed_lib = self.ds.headers_feed_lib
         self.data_feed_lib = self.ds.filter_column(self.ds.data_feed_lib, self.headers_feed_lib.s_ID,
-                                                   self.ingredient_ids)
+                                                   self.ingredient_ids,
+                                                        int64=True)
 
         self.cost_vector = self.ds.sorted_column(self.data_feed_scenario, self.headers_feed_scenario.s_feed_cost,
                                                  self.ingredient_ids,

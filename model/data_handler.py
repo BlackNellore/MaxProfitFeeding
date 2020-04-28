@@ -389,7 +389,7 @@ class Data:
         return batch[col_name].loc[period[0]:period[1]]
 
     @staticmethod
-    def filter_column(data_frame, col_name, val, int64=False):
+    def filter_column(data_frame, col_name, val, int64=True):
         """ Filter elements in data_frame where col_name == val or in [val]"""
         if int64:
             try:

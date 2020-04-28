@@ -103,7 +103,7 @@ class Diet:
         optimizer.clear_searcher(force=True)
         algorithm = Algorithms[parameters[headers_scenario.s_algorithm]]
         batch_id = parameters[headers_scenario.s_batch]
-        batch_parameters = ds.filter_column(data_batch, headers_batch.s_batch_id, batch_id)
+        batch_parameters = ds.filter_column(data_batch, headers_batch.s_batch_id, batch_id, int64=True)
 
         # batch_space = range(list(batch_parameters[headers_batch.s_initial_period])[0],
         #                     list(batch_parameters[headers_batch.s_final_period])[0],
