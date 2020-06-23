@@ -7,6 +7,9 @@ Thus, we do not hold any responsibility for applications of this work in livesto
 Always consult a veterinary before changing the feed composition for your herd.
 
 This model is part of a PhD project at the University of Edinburgh and a thematic project funded by FAPESP.
+If you refeer to this code, cite as: 
+
+**Marques, J., Silva, R., Barioni, L., Hall, J., Tedeschi, L., & Moran, D. (2020). An improved algorithm for solving profit-maximizing cattle diet problems. Animal, 1-10. [doi:10.1017/S1751731120001433](https://doi.org/10.1017/S1751731120001433)**
 
 
 #### References
