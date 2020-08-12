@@ -4,7 +4,7 @@ import pandas
 from model import data_handler
 from model.nrc_equations import NRC_eq as nrc
 import logging
-from model.data_handler import Data
+import math
 
 cnem_lb, cnem_ub = 0.8, 3
 
@@ -24,16 +24,22 @@ class Model:
     data_scenario: pandas.DataFrame = None  # Scenario
     headers_scenario: data_handler.Data.ScenarioParameters = None  # Scenario
 
-    p_id, p_feed_scenario, p_breed, p_sbw, p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, p_linearization_factor, \
-    p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_obj = [None for i in range(18)]
+    p_id, p_feed_scenario, p_breed, p_sbw, p_feed_time, p_target_weight, \
+    p_bcs, p_be, p_l, p_sex, p_a2, p_ph, p_selling_price, \
+    p_algorithm, p_identifier, p_lb, p_ub, p_tol, p_dmi_eq, p_obj = [None for i in range(20)]
 
     _diet = None
     _p_mpm = None
     _p_dmi = None
     _p_nem = None
+    _p_neg = None
     _p_pe_ndf = None
     _p_cnem = None
+    _p_cneg = None
     _var_names_x = None
+    _p_swg = None
+    _model_feeding_time = None
+    _model_final_weight = None
 
     _print_model_lp = False
     _print_model_lp_infeasible = False
@@ -45,21 +51,41 @@ class Model:
     def __init__(self, out_ds, parameters):
         self._cast_data(out_ds, parameters)
 
+    @staticmethod
+    def _remove_inf(vector):
+        for i in range(len(vector)):
+            if vector[i] == float("-inf"):
+                vector[i] = -bigM
+            elif vector[i] == float("inf"):
+                vector[i] = bigM
+
     def run(self, p_id, p_cnem):
         """Either build or update model, solve ir and return solution = {dict xor None}"""
         logging.info("Populating and running model")
         try:
             self.opt_sol = None
             self._p_cnem = p_cnem
-            self._compute_parameters()
+            if not self._compute_parameters(p_id):
+                self._infeasible_output(p_id)
+                return None
             if self._diet is None:
                 self._build_model()
             else:
                 self._update_model()
             return self._solve(p_id)
         except Exception as e:
-            logging.error("An error occurred:\n{}".format(str(e)))
+            logging.error("An error occurred in lp_model.py L86:\n{}".format(str(e)))
             return None
+
+    def _get_params(self, p_swg):
+        if p_swg is None:
+            return dict(zip(["CNEm", "CNEg", "NEm", "NEg", "DMI", "MPm",  "peNDF"],
+                            [self._p_cnem, self._p_cneg, self._p_nem, self._p_neg,
+                             self._p_dmi, self._p_mpm * 0.001, self._p_pe_ndf]))
+        else:
+            return dict(zip(["CNEm", "CNEg", "NEm", "NEg", "SWG", "DMI", "MPm",  "peNDF"],
+                            [self._p_cnem, self._p_cneg, self._p_nem, self._p_neg, p_swg,
+                             self._p_dmi, self._p_mpm * 0.001, self._p_pe_ndf]))
 
     def _solve(self, problem_id):
         """Return None if solution is infeasible or Solution dict otherwise"""
@@ -69,55 +95,68 @@ class Model:
         status = diet.get_solution_status()
         logging.info("Solution status: {}".format(status))
         if status.__contains__("infeasible"):
-            sol_id = {"Problem_ID": self.prefix_id + str(problem_id)}
-            params = dict(zip(["CNEm", "MPm", "DMI", "NEm", "peNDF"],
-                              [self._p_cnem, self._p_mpm * 0.001, self._p_dmi, self._p_nem, self._p_pe_ndf]))
-            sol = {**sol_id, **params}
-            self.opt_sol = None
-            logging.warning("Infeasible parameters:{}".format(sol))
+            self._infeasible_output(problem_id)
             return None
 
-        sol_id = {"Problem_ID": problem_id}
+        sol_id = {"Problem_ID": problem_id,
+                  "Feeding Time": self._model_feeding_time,
+                  "Initial weight": self.p_sbw,
+                  "Final weight": self._model_final_weight}
         sol = dict(zip(diet.get_variable_names(), diet.get_solution_vec()))
         sol["obj_func"] = diet.get_solution_obj()
         sol["obj_cost"] = 0
-        sol["factor"] = (self._p_dmi - self._p_nem / self._p_cnem)
-        sol["CNEg"] = 0
-        sol["obj_revenue"] = 0
-        for i in range(len(self.cost_vector)):
-            sol["CNEg"] += self.neg_vector[i] * diet.get_solution_vec()[i]
+        sol["obj_revenue"] = self.revenue
+        for i in range(len(self._var_names_x)):
             sol["obj_cost"] += diet.get_solution_vec()[i] * self.expenditure_obj_vector[i]
-            sol["obj_revenue"] += diet.get_solution_vec()[i] * self.revenue_obj_vector[i]
 
-        p_swg = nrc.swg(sol["CNEg"], self._p_dmi, self._p_cnem, self._p_nem, self.p_sbw, self.p_linearization_factor)
-        params = dict(zip(["CNEm", "MPm", "DMI", "NEm", "SWG", "peNDF"],
-                          [self._p_cnem, self._p_mpm * 0.001, self._p_dmi, self._p_nem, p_swg, self._p_pe_ndf]))
+        params = self._get_params(self._p_swg)
         sol_activity = dict(zip(["{}_act".format(constraint) for constraint in self.constraints_names],
                                 diet.get_solution_activity_levels(self.constraints_names)))
         sol_rhs = dict(zip(["{}_rhs".format(constraint) for constraint in self.constraints_names],
                            diet.get_constraints_rhs(self.constraints_names)))
         sol_red_cost = dict(zip(["{}_red_cost".format(var) for var in diet.get_variable_names()],
-                                diet.get_dual_values()))
+                                diet.get_dual_reduced_costs())) #get dual values
         sol_dual = dict(zip(["{}_dual".format(const) for const in diet.get_constraints_names()],
-                            diet.get_dual_reduced_costs()))
+                            diet.get_dual_values())) # get dual reduced costs
         sol_slack = dict(zip(["{}_slack".format(const) for const in diet.get_constraints_names()],
                              diet.get_dual_linear_slacks()))
-        sol_obj_cost = dict(zip(["{}_obj_cneg".format(var) for var in diet.get_variable_names()],
-                                self.neg_vector))
         sol = {**sol_id, **params, **sol, **sol_rhs, **sol_activity,
-               **sol, **sol_dual, **sol_red_cost, **sol_slack, **sol_obj_cost}
+               **sol, **sol_dual, **sol_red_cost, **sol_slack}
         self.opt_sol = diet.get_solution_obj()
 
         return sol
 
+    def _infeasible_output(self, problem_id):
+        sol_id = {"Problem_ID": self.prefix_id + str(problem_id)}
+        params = self._get_params(p_swg=None)
+        sol = {**sol_id, **params}
+        self.opt_sol = None
+        # diet.write_lp(f"lp_infeasible_{str(problem_id)}.lp")
+        logging.warning("Infeasible parameters:{}".format(sol))
+
     # Parameters filled by inner method ._cast_data()
     n_ingredients = None
     cost_vector = None
-    neg_vector = None
     cost_obj_vector = None
     constraints_names = None
-    revenue_obj_vector = None
+    # revenue_obj_vector = None
+    revenue = None
     expenditure_obj_vector = None
+    dm_af_coversion = None
+    cst_obj = None
+    scenario_parameters = None
+
+    def __set_parameters(self, parameters):
+        if isinstance(parameters, dict):
+            [self.p_id, self.p_feed_scenario, self.p_breed, self.p_sbw, self.p_feed_time,
+             self.p_target_weight,self.p_bcs, self.p_be, self.p_l,
+             self.p_sex, self.p_a2, self.p_ph, self.p_selling_price,
+             self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_dmi_eq, self.p_obj] = parameters.values()
+        elif isinstance(parameters, list):
+            [self.p_id, self.p_feed_scenario, self.p_breed, self.p_sbw, self.p_feed_time,
+             self.p_target_weight,self.p_bcs, self.p_be, self.p_l,
+             self.p_sex, self.p_a2, self.p_ph, self.p_selling_price,
+             self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters
 
     def _cast_data(self, out_ds, parameters):
         """Retrieve parameters data from table. See data_handler.py for more"""
@@ -126,16 +165,15 @@ class Model:
         self.data_feed_scenario = self.ds.data_feed_scenario
         self.headers_feed_scenario = self.ds.headers_feed_scenario
 
-
-
-        [self.p_id, self.p_feed_scenario, self.p_breed, self.p_sbw, self.p_bcs, self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph,
-         self.p_selling_price, self.p_linearization_factor,
-         self.p_algorithm, self.p_identifier, self.p_lb, self.p_ub, self.p_tol, self.p_obj] = parameters.values()
+        self.scenario_parameters = parameters
+        self.__set_parameters(parameters)
 
         headers_feed_scenario = self.ds.headers_feed_scenario
         self.data_feed_scenario = self.ds.filter_column(self.ds.data_feed_scenario,
                                                         self.ds.headers_feed_scenario.s_feed_scenario,
                                                         self.p_feed_scenario)
+        self.data_feed_scenario = self.ds.sort_df(self.data_feed_scenario, self.headers_feed_scenario.s_ID)
+
         self.ingredient_ids = list(
             self.ds.get_column_data(self.data_feed_scenario, self.headers_feed_scenario.s_ID, int))
 
@@ -146,51 +184,69 @@ class Model:
         self.cost_vector = self.ds.sorted_column(self.data_feed_scenario, self.headers_feed_scenario.s_feed_cost,
                                                  self.ingredient_ids,
                                                  self.headers_feed_scenario.s_ID)
-        self.neg_vector = self.ds.sorted_column(self.data_feed_lib, self.headers_feed_lib.s_NEga,
-                                                self.ingredient_ids,
-                                                self.headers_feed_lib.s_ID)
         self.n_ingredients = self.data_feed_scenario.shape[0]
         self.cost_vector = self.ds.sorted_column(self.data_feed_scenario, headers_feed_scenario.s_feed_cost,
                                                  self.ingredient_ids,
                                                  self.headers_feed_scenario.s_ID)
-        dm_af_coversion = self.ds.sorted_column(self.data_feed_lib, self.headers_feed_lib.s_DM,
+        self.dm_af_coversion = self.ds.sorted_column(self.data_feed_lib, self.headers_feed_lib.s_DM,
                                                 self.ingredient_ids,
                                                 self.headers_feed_lib.s_ID)
-        for i in range(len(self.cost_vector)):
-            self.cost_vector[i] /= dm_af_coversion[i]
-        self.neg_vector = self.ds.sorted_column(self.data_feed_lib, self.headers_feed_lib.s_NEga,
-                                                self.ingredient_ids,
-                                                self.headers_feed_lib.s_ID)
+#         for i in range(len(self.cost_vector)):
+#             self.cost_vector[i] /= self.dm_af_coversion[i]
 
-    def _compute_parameters(self):
+    def _compute_parameters(self, problem_id):
+
         """Compute parameters variable with CNEm"""
         self._p_mpm, self._p_dmi, self._p_nem, self._p_pe_ndf = \
             nrc.get_all_parameters(self._p_cnem, self.p_sbw, self.p_bcs,
-                                   self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph)
+                                   self.p_be, self.p_l, self.p_sex, self.p_a2, self.p_ph, self.p_target_weight, self.p_dmi_eq)
+
+        self._p_cneg = nrc.cneg(self._p_cnem)
+        self._p_neg = nrc.neg(self._p_cneg, self._p_dmi, self._p_cnem, self._p_nem)
+        if self._p_neg is None:
+            return False
+        # self._p_swg = nrc.swg(self._p_neg, self.p_sbw, self.p_target_weight)
+        if math.isnan(self.p_feed_time) or self.p_feed_time == 0:
+            self._model_final_weight = self.p_target_weight
+            self._p_swg = nrc.swg(self._p_neg, self.p_sbw, self._model_final_weight)
+            self._model_feeding_time = (self.p_target_weight - self.p_sbw)/self._p_swg
+        elif math.isnan(self.p_target_weight) or self.p_target_weight == 0:
+            self._model_feeding_time = self.p_feed_time
+            self._p_swg = nrc.swg_time(self._p_neg, self.p_sbw, self._model_feeding_time)
+            self._model_final_weight = self._model_feeding_time * self._p_swg + self.p_sbw
+        else:
+            raise Exception("target weight and feeding time cannot be defined at the same time")
 
         self.cost_obj_vector = self.cost_vector.copy()
-        self.revenue_obj_vector = self.cost_vector.copy()
+        for i in range(len(self.cost_obj_vector)):
+            self.cost_obj_vector[i] /= self.dm_af_coversion[i]
+            
+        self.revenue = self.p_selling_price * (self.p_sbw + self._p_swg * self._model_feeding_time)
+        # self.revenue_obj_vector = self.cost_vector.copy()
         self.expenditure_obj_vector = self.cost_vector.copy()
-        swg = []
         for i in range(len(self.cost_vector)):
-            swg.append(nrc.swg(self.neg_vector[i], self._p_dmi, self._p_cnem,
-                               self._p_nem, self.p_sbw, self.p_linearization_factor))
-            self.revenue_obj_vector[i] = \
-                self.p_selling_price * swg[i]
-            self.expenditure_obj_vector[i] = self.cost_vector[i] * self._p_dmi
-        r = [self.revenue_obj_vector[i] - self.expenditure_obj_vector[i] for i in range(len(self.revenue_obj_vector))]
+            # self.revenue_obj_vector[i] = self.p_selling_price * (self.p_sbw + self._p_swg * self._model_feeding_time)
+            self.expenditure_obj_vector[i] = self.cost_vector[i] * self._p_dmi * self._model_feeding_time
+        # r = [self.revenue_obj_vector[i] - self.expenditure_obj_vector[i] for i in range(len(self.revenue_obj_vector))]
         if self.p_obj == "MaxProfit":
             for i in range(len(self.cost_vector)):
-                self.cost_obj_vector[i] = self.revenue_obj_vector[i] - self.expenditure_obj_vector[i]
+                self.cost_obj_vector[i] = - self.expenditure_obj_vector[i]
+            self.cst_obj = self.revenue
         elif self.p_obj == "MinCost":
             for i in range(len(self.cost_vector)):
                 self.cost_obj_vector[i] = - self.expenditure_obj_vector[i]
+            self.cst_obj = 0
         elif self.p_obj == "MaxProfitSWG":
             for i in range(len(self.cost_vector)):
-                if swg[i] == 0:
-                    swg[i] = 1/bigM
-                self.cost_obj_vector[i] = (self.revenue_obj_vector[i] - self.expenditure_obj_vector[i])/swg[i]
-        pass
+                self.cost_obj_vector[i] = -(self.expenditure_obj_vector[i])/self._p_swg
+            self.cst_obj = self.revenue/self._p_swg
+        elif self.p_obj == "MinCostSWG":
+            for i in range(len(self.cost_vector)):
+                self.cost_obj_vector[i] = -(self.expenditure_obj_vector[i])/self._p_swg
+            self.cst_obj = 0
+
+#         self.cost_obj_vector_mono = self.cost_obj_vector.copy()
+        return True
 
     def _build_model(self):
         """Build model (initially based on CPLEX 12.8.1)"""
@@ -200,6 +256,8 @@ class Model:
 
         diet = self._diet
         diet.set_sense(sense="max")
+
+        self._remove_inf(self.cost_obj_vector)
 
         x_vars = list(diet.add_variables(obj=self.cost_obj_vector,
                                          lb=self.ds.sorted_column(self.data_feed_scenario,
@@ -211,6 +269,7 @@ class Model:
                                                                   self.ingredient_ids,
                                                                   self.headers_feed_scenario.s_ID),
                                          names=self._var_names_x))
+        diet.set_obj_offset(self.cst_obj)
 
         "Constraint: sum(x a) == CNEm"
         diet.add_constraint(names=["CNEm GE"],
@@ -247,14 +306,12 @@ class Model:
                                               self.headers_feed_lib.s_ID)
         mpm_list = [nrc.mp(*row) for row in mp_properties]
 
-        for i, v in enumerate(mpm_list):
-            mpm_list[i] = v - self.neg_vector[i] * (nrc.swg_const(self._p_dmi, self._p_cnem, self._p_nem,
-                                                                  self.p_sbw, self.p_linearization_factor) * 268
-                                                    - self.neg_vector[i] * 29.4) * 0.001 / self._p_dmi
+        # for i, v in enumerate(mpm_list):
+        #     mpm_list[i] = v - (self._p_swg * 268 - self._p_neg * 29.4) * 0.001 / self._p_dmi
 
         diet.add_constraint(names=["MPm"],
                             lin_expr=[[x_vars, mpm_list]],
-                            rhs=[self._p_mpm * 0.001 / self._p_dmi],
+                            rhs=[(self._p_mpm + 268 * self._p_swg - 29.4 * self._p_neg)* 0.001 / self._p_dmi],
                             senses=["G"]
                             )
 
@@ -301,8 +358,6 @@ class Model:
                             senses=["G"]
                             )
 
-        # TODO: Put constraint to limit Urea in the diet: sum(x) * DMI <= up_limit
-
         self.constraints_names = diet.get_constraints_names()
         # diet.write_lp(name="file.lp")
         pass
@@ -320,4 +375,5 @@ class Model:
 
         seq_of_pairs = tuple(zip(new_rhs.keys(), new_rhs.values()))
         self._diet.set_constraint_rhs(seq_of_pairs)
-        self._diet.set_objective_function(list(zip(self._var_names_x, self.cost_obj_vector)))
+
+        self._diet.set_objective_function(list(zip(self._var_names_x, self.cost_obj_vector)), self.cst_obj)

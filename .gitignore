@@ -1,7 +1,3 @@
-*.bcNRF
-*.pyc
-*.xml
-*.iml
-*.gitignore
-*.png
-/UML/
+
+/Output
+/temp_output

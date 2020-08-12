@@ -17,7 +17,7 @@ def config():
     if platform.system() in ('Windows', 'Microsoft'):
         highslib = ctypes.cdll.LoadLibrary("./optimizer/resources/highs.dll")
     else:
-        # TODO: Implement call to LINUS .so solver
+        # TODO: Implement call to LINUX .so solver
         raise SystemError("Only windows dll available")
 
     highslib.Highs_call.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int,
@@ -100,6 +100,14 @@ def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, 
     row_dual = dbl_array_type_row(*row_dual)
     col_basis = int_array_type_col(*col_basis)
     row_basis = int_array_type_row(*row_basis)
+    logging.info(f"colcost=[{colcost}\n"
+                 f"collower={collower}\n"
+                 f"colupper={colupper}\n"
+                 f"rowlower={rowlower}\n"
+                 f"rowupper={rowupper}\n"
+                 f"astart={astart}\n"
+                 f"aindex={aindex}\n"
+                 f"avalue={avalue}\n")
     try:
         retcode = highslib.Highs_call(
             ctypes.c_int(n_col), ctypes.c_int(n_row), ctypes.c_int(n_nz),
@@ -109,8 +117,12 @@ def highs_call(colcost, collower, colupper, rowlower, rowupper, astart, aindex, 
             col_value, col_dual,
             row_value, row_dual,
             col_basis, row_basis, ctypes.byref(ctypes.c_int(return_val)))
+        print(retcode)
     except Exception as e:
-        logging.error("An error occurred when executing HiGHS, probably infeasible: {}".format(str(e)))
+        if "writing" in e.args[0]:
+            logging.error("A serious error occurred when executing HiGHS: {}".format(str(e)))
+        else:
+            logging.error("An error occurred when executing HiGHS, probably infeasible: {}".format(str(e)))
         return None
     return retcode, list(col_value), list(col_dual), list(row_value), list(row_dual), list(col_basis), list(row_basis)
 
@@ -166,6 +178,7 @@ class Model:
     rev_cs_map = {}
     solution = None
     sense, variables, constraints, var_lb, var_ub = [None for j in range(5)]
+    objective_offset = 0
 
     def __init__(self):
         self.variables = {}
@@ -241,7 +254,8 @@ class Model:
         :type names: list
         :return:
         """
-        # TODO: check length and raise error
+        if len(obj) != len(ub) or len(obj) != len(lb):
+            raise IndexError("lp_model > add_variables, vector's length don't match")
         if len(names) == 0:
             names = list(range(len(obj)))
         for i in range(len(names)):
@@ -297,6 +311,26 @@ class Model:
             if self.constraints[cons_tuple[0]]["sense"] == "G":
                 self.constraints[cons_tuple[0]]["lhs"] = cons_tuple[1]
 
+    def set_constraint_sense(self, cst_name, sense):
+        if sense in ["L", "G"]:
+            self.constraints[cst_name]["sense"] = sense
+        else:
+            raise Exception(f"sense {sense} not supported")
+
+    def set_constraint_coefficients(self, seq_of_triplets):
+        for triplet in seq_of_triplets:
+            cst = triplet[0]
+            var = triplet[1]
+            index = list(self.constraints[cst]['variables']).index(var)
+            val = triplet[2]
+            self.constraints[cst]["coefficients"][index] = val
+
+    def set_objective_offset(self, val):
+        self.objective_offset = val
+
+    def get_objective_offset(self):
+        return self.objective_offset
+
     def set_objective_function(self, obj_vec):
         names = list(self.variables.keys())
         for i in range(len(self.variables)):
@@ -313,7 +347,13 @@ class Model:
     def get_constraints_rhs(self, constraints):
         rhs = []
         for cs_name in constraints:
-            rhs.append(self.solution.constraints[cs_name]["active"])
+            if self.constraints[cs_name]["sense"] == "E":
+                rhs.append(self.constraints[cs_name]["rhs"] - epsilon)
+            if self.constraints[cs_name]["sense"] == "L":
+                rhs.append(self.constraints[cs_name]["rhs"])
+            if self.constraints[cs_name]["sense"] == "G":
+                rhs.append(self.constraints[cs_name]["lhs"])
+
         return rhs
 
     def get_variable_names(self):
@@ -334,7 +374,7 @@ class Model:
         return list(self.solution.variables.values())
 
     def get_solution_obj(self):
-        return self.solution.opt_objective * self.sense
+        return self.solution.opt_objective * self.sense + self.objective_offset
 
     def get_solution_activity_levels(self, constraints):
         activity = []
@@ -343,10 +383,14 @@ class Model:
         return activity
 
     def get_dual_reduced_costs(self):
-        return list(self.solution.reduced_cost)
-
+        #return list(self.solution.dual_variables) #list(self.solution.reduced_cost)
+        red_costs = []
+        for i in range(len(self.solution.dual_variables)):
+            red_costs.append(- self.solution.dual_variables[i])
+        return red_costs
+        
     def get_dual_values(self):
-        return list(self.solution.dual_variables)
+        return list(self.solution.reduced_cost) #list(self.solution.dual_variables)
 
     def get_dual_linear_slacks(self):
         slacks = []

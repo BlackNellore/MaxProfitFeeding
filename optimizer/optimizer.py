@@ -70,15 +70,15 @@ class Optimizer:
         
         if SOLVER == "CPLEX":
             variables = self.model.variables.add(obj=kwargs["obj"],
-                                            lb=kwargs["lb"],
-                                            ub=kwargs["ub"],
-                                            names=kwargs["names"])
+                                                 lb=kwargs["lb"],
+                                                 ub=kwargs["ub"],
+                                                 names=kwargs["names"])
             return variables
         elif SOLVER == "HiGHS":
             variables = self.model.add_variables(obj=kwargs["obj"],
-                                            lb=kwargs["lb"],
-                                            ub=kwargs["ub"],
-                                            names=kwargs["names"])
+                                                 lb=kwargs["lb"],
+                                                 ub=kwargs["ub"],
+                                                 names=kwargs["names"])
             return variables
 
 
@@ -90,18 +90,32 @@ class Optimizer:
         
         if SOLVER == "CPLEX":
             self.model.linear_constraints.add(names=kwargs["names"],
-                                         lin_expr=kwargs["lin_expr"],
-                                         rhs=kwargs["rhs"],
-                                         senses=kwargs["senses"]
-                                         )
+                                              lin_expr=kwargs["lin_expr"],
+                                              rhs=kwargs["rhs"],
+                                              senses=kwargs["senses"]
+                                              )
         elif SOLVER == "HiGHS":
             self.model.add_constraint(names=kwargs["names"],
-                                 lin_expr=kwargs["lin_expr"],
-                                 rhs=kwargs["rhs"],
-                                 senses=kwargs["senses"]
-                                 )
+                                      lin_expr=kwargs["lin_expr"],
+                                      rhs=kwargs["rhs"],
+                                      senses=kwargs["senses"]
+                                      )
 
     # CHANGING CURRENT self.model
+    def set_obj_offset(self, val):
+        if SOLVER == "CPLEX":
+            self.model.objective.set_offset(val)
+        elif SOLVER == "HiGHS":
+            self.model.set_objective_offset(val)
+
+    def set_constraint_sense(self, cst_name, sense):
+        """
+         constraint name and new sense (L or G)
+        """
+        if SOLVER == "CPLEX":
+            self.model.linear_constraints.set_senses(cst_name, sense)
+        elif SOLVER == "HiGHS":
+            self.model.set_constraint_sense(cst_name, sense)
 
     def set_constraint_rhs(self, seq_of_pairs):
         """
@@ -113,8 +127,16 @@ class Optimizer:
         elif SOLVER == "HiGHS":
             self.model.set_constraint_rhs(seq_of_pairs)
 
+    def set_constraint_coefficients(self, seq_of_triplets):
+        """
+        [(constraint, var_name, value)]
+        """
+        if SOLVER == "CPLEX":
+            self.model.linear_constraints.set_coefficients(seq_of_triplets)
+        elif SOLVER == "HiGHS":
+            self.model.set_constraint_coefficients(seq_of_triplets)
 
-    def set_objective_function(self, objective_vector):
+    def set_objective_function(self, objective_vector, offset=0):
         """
         :param objective_vector: list with floats
         """
@@ -123,6 +145,8 @@ class Optimizer:
             self.model.objective.set_linear(objective_vector)
         elif SOLVER == "HiGHS":
             self.model.set_objective_function(objective_vector)
+
+        self.set_obj_offset(offset)
 
     # AUXILIARY FUNCTIONS
 
